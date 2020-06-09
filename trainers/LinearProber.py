@@ -10,8 +10,14 @@ __all__ = ['LinearProber']
 
 
 class LinearProber():
+    """Test representation encoder performance via linear classification"""
     def __init__(self, encoder, dataloaders, dataset_sizes, device='cuda:0', \
                  num_classes=100, rep_channel_dim=512, pool_size=1, pool_type='avg'):
+        """
+        rep_channel_dim : dim of representation dimension
+        pool_size : if the rep dim is [N * rep_channel_dim * M * M], apply pool_size = M
+        pool_type : either 'avg' or 'max'
+        """
         
         self.prober = LinearClassifier(num_classes, rep_channel_dim, pool_size, pool_type)
         self.encoder = encoder
@@ -111,6 +117,7 @@ class LinearProber():
         
     
     def _data_setter(self, device):
+        """load all the representations for datasets. will be used as dataloaders for training classifier."""
         for phase in ['train', 'valid', 'test']:
             features, labels = feature_concater(self.encoder, self.dataloaders, phase, device, from_encoder=True)
             prob_set = ProbDataset(features, labels)
@@ -134,6 +141,9 @@ class LinearClassifier(nn.Module):
 
 
     def forward(self, x):
+        if len(x.shape) != 4:
+            x = x.reshape(x.size(0), x.size(1), 1, 1)
+        
         output = self.classifier(x)
         return output
 

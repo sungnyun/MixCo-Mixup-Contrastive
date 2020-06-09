@@ -47,5 +47,6 @@ def simclr_transform(img_size=32, s=1):
                                           transforms.RandomHorizontalFlip(),
                                           transforms.RandomApply([color_jitter], p=0.8),
                                           transforms.RandomGrayscale(p=0.2),
-                                          GaussianBlur(kernel_size=int(0.1 * img_size))])
+                                          GaussianBlur(kernel_size=int(0.1 * img_size)),
+                                          transforms.ToTensor()])
     return data_transforms

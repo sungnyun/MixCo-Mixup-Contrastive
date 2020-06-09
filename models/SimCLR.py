@@ -3,7 +3,7 @@
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
-from Architectures.ResNet import *
+from .Architectures.ResNet import *
 
 __all__ = ['ResNetSimCLR']
 
@@ -24,6 +24,9 @@ class ResNetSimCLR(nn.Module):
         # projection MLP
         self.l1 = nn.Linear(num_ftrs, num_ftrs)
         self.l2 = nn.Linear(num_ftrs, out_dim)
+        
+        self.rep_dim = num_ftrs
+        self.out_dim = out_dim
 
     def _get_basemodel(self, model_name):
         try:

@@ -2,11 +2,12 @@
 
 import torch
 import numpy as np
+import torch.nn.functional as F
 
 
 class NTXentLoss(torch.nn.Module):
 
-    def __init__(self, device, batch_size, temperature, use_cosine_similarity):
+    def __init__(self, device, batch_size=128, temperature=1, use_cosine_similarity=True):
         super(NTXentLoss, self).__init__()
         self.batch_size = batch_size
         self.temperature = temperature
@@ -47,6 +48,9 @@ class NTXentLoss(torch.nn.Module):
         return v
 
     def forward(self, zis, zjs):
+        zis = F.normalize(zis, dim=1)
+        zjs = F.normalize(zjs, dim=1)
+        
         representations = torch.cat([zjs, zis], dim=0)
 
         similarity_matrix = self.similarity_function(representations, representations)

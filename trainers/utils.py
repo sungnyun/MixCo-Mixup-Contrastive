@@ -36,8 +36,7 @@ def feature_concater(model, dataloaders, phases=['test'], device='cuda:0', from_
             for inputs, labels in dataloaders[phase]:
                 inputs, labels = inputs.to(device), labels.to(device)
                 if from_encoder:
-                    features = model(inputs)
-                    
+                    features, _ = model(inputs) # from h(representation), x(output after linear)
                 else:
                     _, features = model(inputs) # when inferenced from a normal network (e.x. ResNet)
                     
@@ -84,4 +83,3 @@ def directory_setter(path='./results', make_dir=False):
 def path_setter(result_path, sub_loc, model_name):
     save_path = '/'.join((result_path, sub_loc, model_name))
     return save_path
-    
