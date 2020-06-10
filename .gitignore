@@ -4,4 +4,3 @@ kd_weights/
 results/
 .ipynb_checkpoints/
 __pycache__/
-*.ipynb
