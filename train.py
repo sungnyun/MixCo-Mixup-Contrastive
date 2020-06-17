@@ -1,124 +1,43 @@
-import torch
-from models import *
+from models.SimCLR import ResNetSimCLR
+from trainers import *
+from eval_tools.lossfuncs import NTXentLoss
 from data_utils import *
+from utils.utils import set_device
+import config
 
-import torch.nn.functional as F
-from loss.nt_xent import NTXentLoss
-import os
-import shutil
-import sys
-
-
-import numpy as np
-
-torch.manual_seed(0)
+import torch
+import torch.nn as nn
+import torch.optim as optim
+import torch.optim.lr_scheduler as lr_scheduler
 
 
-def _save_config_file(model_checkpoints_folder):
-    if not os.path.exists(model_checkpoints_folder):
-        os.makedirs(model_checkpoints_folder)
-        shutil.copy('./config.yaml', os.path.join(model_checkpoints_folder, 'config.yaml'))
+device = set_device(args)
+model = ResNetSimCLR(base_model='resnet50', out_dim=128, from_small=True).to(device)
+if torch.cuda.device_count() >= 2:
+    model = nn.DataParallel(model)
 
+dataloaders, dataset_sizes = data_loader(args.dataset, 
+                                         args.dir_data, 
+                                         rep_augment='simclr', 
+                                         batch_size=args.batch_size,
+                                         valid_ratio=args.valid_ratio,
+                                         pin_memory=True,
+                                         num_workers=args.num_workers,
+                                         drop_last=True)
 
-class SimCLR(object):
+optimzier = optim.SGD(model.parameters(), lr=args.lr, momentum=0.9, weight_decay=1e-6)
+scheduler = lr_scheduler.CosineAnnealigLR(optimizer, T_max=80, eta_min=1e-5)
+criterion = NTXentLoss(device, args.batch_size, args.temperature, use_cosine_similarity=True)
 
-    def __init__(self, dataset, config):
-        self.config = config
-        self.device = self._get_device()
-        self.writer = SummaryWriter()
-        self.dataset = dataset
-        self.nt_xent_criterion = NTXentLoss(self.device, config['batch_size'], **config['loss'])
+trainer = SimCLRTrainer(model, dataloaders, dataset_sizes, criterion, optimizer, scheduler, device)
 
-    def _get_device(self):
-        device = 'cuda' if torch.cuda.is_available() else 'cpu'
-        print("Running on:", device)
-        return device
+probe_loaders, probe_sizes = data_loader(args.dataset,
+                                         args.dir_data,
+                                         rep_augment=None,
+                                         batch_size=128)
+# TODO: change num_classes
+probe_setup = {'dataloaders': probe_loaders,
+               'dataset_sizes': probe_sizes,
+               'num_classes': 100}
 
-    def _step(self, model, xis, xjs, n_iter):
-
-        # get the representations and the projections
-        ris, zis = model(xis)  # [N,C]
-
-        # get the representations and the projections
-        rjs, zjs = model(xjs)  # [N,C]
-
-        # normalize projection feature vectors
-        zis = F.normalize(zis, dim=1)
-        zjs = F.normalize(zjs, dim=1)
-
-        loss = self.nt_xent_criterion(zis, zjs)
-        return loss
-
-    def train(self):
-
-        train_loader, valid_loader = self.dataset.get_data_loaders()
-
-        model = ResNetSimCLR(**self.config["model"]).to(self.device)
-        model = self._load_pre_trained_weights(model)
-
-        optimizer = torch.optim.Adam(model.parameters(), 3e-4, weight_decay=eval(self.config['weight_decay']))
-
-        scheduler = torch.optim.lr_scheduler.CosineAnnealingLR(optimizer, T_max=len(train_loader), eta_min=0,
-                                                               last_epoch=-1)
-
-        model_checkpoints_folder = os.path.join(self.writer.log_dir, 'checkpoints')
-
-        # save config file
-        _save_config_file(model_checkpoints_folder)
-
-        n_iter = 0
-        valid_n_iter = 0
-        best_valid_loss = np.inf
-
-        for epoch_counter in range(self.config['epochs']):
-            for (xis, xjs), _ in train_loader:
-                optimizer.zero_grad()
-
-                xis = xis.to(self.device)
-                xjs = xjs.to(self.device)
-
-                loss = self._step(model, xis, xjs, n_iter)
-
-                if n_iter % self.config['log_every_n_steps'] == 0:
-                    self.writer.add_scalar('train_loss', loss, global_step=n_iter)
-
-
-                loss.backward()
-
-                optimizer.step()
-                n_iter += 1
-
-            # validate the model if requested
-            if epoch_counter % self.config['eval_every_n_epochs'] == 0:
-                valid_loss = self._validate(model, valid_loader)
-                if valid_loss < best_valid_loss:
-                    # save the model weights
-                    best_valid_loss = valid_loss
-                    torch.save(model.state_dict(), os.path.join(model_checkpoints_folder, 'model.pth'))
-
-                self.writer.add_scalar('validation_loss', valid_loss, global_step=valid_n_iter)
-                valid_n_iter += 1
-
-            # warmup for the first 10 epochs
-            if epoch_counter >= 10:
-                scheduler.step()
-            self.writer.add_scalar('cosine_lr_decay', scheduler.get_lr()[0], global_step=n_iter)
-
-    def _validate(self, model, valid_loader):
-
-        # validation steps
-        with torch.no_grad():
-            model.eval()
-
-            valid_loss = 0.0
-            counter = 0
-            for (xis, xjs), _ in valid_loader:
-                xis = xis.to(self.device)
-                xjs = xjs.to(self.device)
-
-                loss = self._step(model, xis, xjs, counter)
-                valid_loss += loss.item()
-                counter += 1
-            valid_loss /= counter
-        model.train()
-        return valid_loss
+trainer.train(num_epochs=args.epochs, probe_freq=args.probe_freq, probe_setup=probe_setup)
