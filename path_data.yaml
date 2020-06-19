@@ -1,0 +1,2 @@
+dir_imagenet = '/home/deepspeed/data/ILSVRC2015/Data/CLS-LOC'
+

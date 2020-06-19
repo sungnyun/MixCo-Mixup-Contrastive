@@ -1,7 +1,7 @@
 from models.SimCLR import ResNetSimCLR
 from trainers import *
 from eval_tools.lossfuncs import NTXentLoss
-from data_utils import *
+from data_utils import data_loader
 from utils.utils import set_device
 import config
 
@@ -35,9 +35,9 @@ probe_loaders, probe_sizes = data_loader(args.dataset,
                                          args.dir_data,
                                          rep_augment=None,
                                          batch_size=128)
-# TODO: change num_classes
+# TODO: change probe_setup
 probe_setup = {'dataloaders': probe_loaders,
                'dataset_sizes': probe_sizes,
-               'num_classes': 100}
+               'num_classes': 1000}
 
 trainer.train(num_epochs=args.epochs, probe_freq=args.probe_freq, probe_setup=probe_setup)

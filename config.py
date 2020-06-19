@@ -15,7 +15,7 @@ parser.add_argument('--lr', type=float, default=0.3)
 parser.add_argument('--valid-ratio', type=float, default=0.1)
 parser.add_argument('--temperature', type=float, default=0.5)
 parser.add_argument('-e', '--epochs', type=int, default=100)
-parser.add_argument('--probe-freq', type=int, default=5)
+parser.add_argument('--probe-freq', type=int, default=None)
 
 
 args = parser.parse_args()
