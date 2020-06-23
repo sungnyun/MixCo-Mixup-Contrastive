@@ -71,9 +71,9 @@ def data_loader(datasets, root, rep_augment=None, batch_size=128,
                                                    transforms.Normalize(mean[datasets], std[datasets])])
         dataset_paths = {'train': os.path.join(root, 'train'),
                          'test': os.path.join(root, 'val')}
-        dataloaders = imagenet_dataloader(dataset_paths, transforms, batch_size, pin_memory, num_workers)
+        dataloaders, dataset_sizes = imagenet_dataloader(dataset_paths, transforms, batch_size, pin_memory, num_workers)
 
-        return dataloaders
+        return dataloaders, dataset_sizes
     
     else:
         valid_transforms = test_transforms if rep_augment is None else train_transforms
