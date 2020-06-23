@@ -5,21 +5,20 @@ import torch.nn as nn
 import torch.nn.functional as F
 from .Architectures.ResNet import *
 
-__all__ = ['ResNetSimCLR']
+__all__ = ['SimCLR']
 
-class ResNetSimCLR(nn.Module):
-
+class SimCLR(nn.Module):
     def __init__(self, base_model, out_dim=128, from_small=False):
-        super(ResNetSimCLR, self).__init__()
-        self.resnet_dict = {
+        super(SimCLR, self).__init__()
+        self.encoder_dict = {
             "resnet10": resnet10(from_small=from_small),
             "resnet18": resnet18(from_small=from_small),
             "resnet50": resnet50(from_small=from_small)}
 
-        resnet = self._get_basemodel(base_model)
-        num_ftrs = resnet.fc.in_features
+        encoder = self._get_basemodel(base_model)
+        num_ftrs = encoder.fc.in_features
 
-        self.features = nn.Sequential(*list(resnet.children())[:-1])
+        self.features = nn.Sequential(*list(encoder.children())[:-1])
 
         # projection MLP
         self.l1 = nn.Linear(num_ftrs, num_ftrs)
@@ -30,7 +29,7 @@ class ResNetSimCLR(nn.Module):
 
     def _get_basemodel(self, model_name):
         try:
-            model = self.resnet_dict[model_name]
+            model = self.encoder_dict[model_name]
             print("Feature extractor:", model_name)
             return model
         except:

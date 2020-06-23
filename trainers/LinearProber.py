@@ -36,23 +36,22 @@ class LinearProber():
         print('========= Linear Probe Training =========')
         
         self.scheduler = lr_scheduler.MultiStepLR(self.optimizer, milestones=decay_milestone, gamma=0.2)
-        #best_model_wts = copy.deepcopy(self.prober.state_dict())
-        #best_acc = 0.0
+        best_model_wts = copy.deepcopy(self.prober.state_dict())
+        best_acc = 0.0
         
         for epoch in range(1, num_epochs+1):
             train_loss, train_acc, _ = self._prober_epoch_phase(phase='train')
-            #valid_loss, valid_acc_1, valid_acc_5 = self._prober_epoch_phase(phase='valid')
+            valid_loss, valid_acc_1, valid_acc_5 = self._prober_epoch_phase(phase='valid')
             
-            self._print_stat(epoch, num_epochs, train_loss, train_acc)
+            self._print_stat(epoch, num_epochs, train_loss, train_acc, valid_loss, valid_acc_1, valid_acc_5)
             
-            #if valid_acc_1 > best_acc:
-            #    best_acc = valid_acc_1
-            #best_model_wts = copy.deepcopy(self.prober.state_dict())
-
+            if valid_acc_1 > best_acc:
+                best_acc = valid_acc_1
+                best_model_wts = copy.deepcopy(self.prober.state_dict())
         
-        #self.prober.load_state_dict(best_model_wts)
+        self.prober.load_state_dict(best_model_wts)
             
-        return train_loss, train_acc
+        return train_loss, train_acc, valid_loss, valid_acc_1, valid_acc_5
     
     
     def test(self, get_vis=False):
@@ -108,17 +107,17 @@ class LinearProber():
         return epoch_loss, epoch_acc_1, epoch_acc_5
 
     
-    def _print_stat(self, epoch, num_epochs, train_loss, train_acc, valid_loss=-1. vald_acc=-1):
+    def _print_stat(self, epoch, num_epochs, train_loss, train_acc, valid_loss, valid_acc_1, valid_acc_5):
         print('[Linear Probe Epoch {}/{}]'.format(epoch, num_epochs))
         print(('[{}] Loss - {:.4f}, Top1 Acc - '.format('Train', train_loss)) + '{:2.2f}% '.format(train_acc*100))
-        #print(('[{}] Loss - {:.4f}, Top1 Acc - '.format('Valid', valid_loss)) + ('{:2.2f}% '.format(valid_acc_1*100)))
-        #print(('[{}] Top5 Acc - '.format('Valid')) + ('{:2.2f}% '.format(valid_acc_5*100)))
+        print(('[{}] Loss - {:.4f}, Top1 Acc - '.format('Valid', valid_loss)) + ('{:2.2f}% '.format(valid_acc_1*100)))
+        print(('[{}] Top5 Acc - '.format('Valid')) + ('{:2.2f}% '.format(valid_acc_5*100)))
         print('-' * 45)
         
     
     def _data_setter(self, device):
         """load all the representations for datasets. will be used as dataloaders for training classifier."""
-        for phase in ['train', 'test']:
+        for phase in ['train', 'valid', 'test']:
             features, labels = feature_concater(self.encoder, self.dataloaders, phase, device, from_encoder=True)
             prob_set = ProbDataset(features, labels)
             self.prob_loader[phase] = torch.utils.data.DataLoader(prob_set, batch_size=256, num_workers=5)

@@ -1,6 +1,7 @@
 import torch
 import os, copy, time
 import json
+import numpy as np
 #import wandb
 from .utils import directory_setter
 
@@ -128,10 +129,10 @@ class BaseTrainer():
     
     def _valid_contitioner(self):
         if 'max' in self.valid_type:
-            best_criterion = 0.0
+            best_criterion = -np.inf
             
         elif 'min' in self.valid_type:
-            best_criterion = 100000000
+            best_criterion = np.inf
         else:
             best_criterion = None
         
@@ -139,8 +140,8 @@ class BaseTrainer():
                 
     def _get_best_valid(self, 
                         best_criterion=None, 
-                        valid_measure=-1, 
-                        valid_loss=-1):
+                        valid_measure=0, 
+                        valid_loss=0):
         
         if self.valid_type == 'max_measure':
             if valid_measure > best_criterion:
@@ -159,7 +160,7 @@ class BaseTrainer():
                 
         elif (self.valid_type == 'none') or (best_criterion == None):
             # get last model if valid_type is not specified
-            best_model_wts = copy.deepdopy(self.model.state_dict())
+            best_model_wts = copy.deepcopy(self.model.state_dict())
         
         return best_criterion, best_model_wts
 
@@ -174,7 +175,7 @@ class BaseTrainer():
         raise NotImplementedError
     
     def _print_stat(self, epoch, num_epochs, epoch_elapse, train_loss, 
-                    train_measure, valid_loss=-1, valid_measure=-1):
+                    train_measure, valid_loss=0, valid_measure=0):
         
         for param_group in self.optimizer.param_groups:
             lr = param_group['lr']

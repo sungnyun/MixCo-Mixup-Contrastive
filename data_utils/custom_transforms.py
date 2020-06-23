@@ -4,12 +4,14 @@ import numpy as np
 import torch
 import torchvision.transforms as transforms
 import random
+from PIL import ImageFilter
 
 np.random.seed(0)
 
-__all__ = ['GaussianBlur', 'RepLearnTransform', 'simclr_transform']
+__all__ = ['RepLearnTransform', 'simclr_transform', 'moco_transform']
 
-class GaussianBlur():
+
+class GaussianBlur_simclr():
     # Implements Gaussian blur as described in the SimCLR paper
     def __init__(self, kernel_size, min=0.1, max=2.0):
         self.min = min
@@ -28,6 +30,17 @@ class GaussianBlur():
             sample = cv2.GaussianBlur(sample, (self.kernel_size, self.kernel_size), sigma)
 
         return sample
+    
+
+class GaussianBlur_moco(object):
+    # Gaussian blur augmentation in SimCLR https://arxiv.org/abs/2002.05709"""
+    def __init__(self, sigma=[.1, 2.]):
+        self.sigma = sigma
+
+    def __call__(self, x):
+        sigma = random.uniform(self.sigma[0], self.sigma[1])
+        x = x.filter(ImageFilter.GaussianBlur(radius=sigma))
+        return x
 
     
 class RepLearnTransform():
@@ -47,8 +60,20 @@ def simclr_transform(mean, std, img_size=32, s=1):
                                           transforms.RandomHorizontalFlip(),
                                           transforms.RandomApply([color_jitter], p=0.8),
                                           transforms.RandomGrayscale(p=0.2),
-                                          GaussianBlur(kernel_size=int(0.1 * img_size)),
+                                          GaussianBlur_simclr(kernel_size=int(0.1 * img_size)),
                                           transforms.ToTensor(),
-                                          transforms.Normalize(mean, std)])
+                                          transforms.Normalize(mean=mean, std=std)])
+    return data_transforms
 
+
+def moco_transform(mean, std, img_size=32):
+    # MoCo v2's aug: similar to SimCLR https://arxiv.org/abs/2002.05709
+    color_jitter = transforms.ColorJitter(0.4, 0.4, 0.4, 0.1)  # not strengthened
+    data_transforms = transforms.Compose([transforms.RandomResizedCrop(size=img_size, scale=(0.2, 1.)),
+                                          transforms.RandomApply([color_jitter], p=0.8),
+                                          transforms.RandomGrayscale(p=0.2),
+                                          transforms.RandomApply([GaussianBlur_moco([.1, 2.])], p=0.5),
+                                          transforms.RandomHorizontalFlip(),
+                                          transforms.ToTensor(),
+                                          transforms.Normalize(mean=mean, std=std)])
     return data_transforms
