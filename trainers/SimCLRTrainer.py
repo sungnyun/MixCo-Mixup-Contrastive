@@ -9,18 +9,12 @@ class SimCLRTrainer(BaseTrainer):
                 optimizer, scheduler, device, use_wandb=False):
         super(SimCLRTrainer, self).__init__(model, dataloaders, dataset_sizes, criterion, 
                                             optimizer, scheduler, device, use_wandb)
-
         self.measure_name = 'Loss'
-        self.valid_type='loss'
-
+        
 
     def train(self, num_epochs, probe_freq=None, probe_setup=None):
+        # save initial weights & get base criterion to select best model
         best_model_wts = copy.deepcopy(self.model.state_dict())
-        
-        if 'max' in self.valid_type:
-            best_criterion = 0.0
-        else:
-            best_criterion = 100000000
         
         print('=' * 50)
         device_name = torch.cuda.get_device_name(int(self.device[-1]))
@@ -30,36 +24,26 @@ class SimCLRTrainer(BaseTrainer):
         for epoch in range(1, num_epochs+1):
             epoch_start = time.time()
             train_loss, train_measure = self.epoch_phase('train', epoch)
-            valid_loss, valid_measure = self.epoch_phase('valid', epoch)
             epoch_elapse = round(time.time() - epoch_start, 3)
             
             self._print_stat(epoch, num_epochs, 
                                   epoch_elapse,
                                   train_loss, 
-                                  train_measure, 
-                                  valid_loss, 
-                                  valid_measure)
+                                  train_measure)
             
-            best_criterion, best_model_wts = self._get_best_valid(best_model_wts, 
-                                                                  best_criterion, 
-                                                                  valid_measure,
-                                                                  valid_loss)
+            best_model_wts = self._get_best_valid()
             result_dict = {
                 'Train_Loss': train_loss,
-                'Valid_Loss': valid_loss,
                 'epoch': epoch}
             
             self._result_logger(epoch, result_dict)
             
             if (probe_freq is not None) and (epoch % probe_freq == 0):
                 prober = self._set_prober(probe_setup)
-                t_prob_loss, t_prob_acc1, v_prob_loss, v_prob_acc1, v_prob_acc5 = result = prober.train()
+                t_prob_loss, t_prob_acc1 = result = prober.train()
                 result_dict = {
                     'Train_ProbLoss': t_prob_loss,
                     'Train_ProbAccuracy1': t_prob_acc1,
-                    'Valid_ProbLoss': v_prob_loss,
-                    'Valid_ProbAccuracy1': v_prob_acc1,
-                    'Valid_ProbAccuracy5': v_prob_acc5,
                     'epoch': epoch}
                 
                 self._result_logger(epoch, result_dict)
@@ -73,7 +57,7 @@ class SimCLRTrainer(BaseTrainer):
         # linear probing (linear classification test).
         if do_probe:
             prober = self._set_prober(probe_setup)
-            t_prob_loss, t_prob_acc1, v_prob_loss, v_prob_acc1, v_prob_acc5 = prober.train()
+            t_prob_loss, t_prob_acc1 = prober.train()
             test_prob_loss, test_prob_acc1, test_prob_acc5 = prober.test()
         
         result_dict = {

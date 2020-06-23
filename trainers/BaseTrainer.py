@@ -19,22 +19,17 @@ class BaseTrainer():
         self.device = device
         self.results = {}
         self.measure_name = 'measure'
-        self.valid_type = 'max_measure'
+        self.valid_type = 'none'
         self.use_wandb = use_wandb
         self.num_epochs = None
     
     def train(self, num_epochs):
         self.num_epochs = num_epochs
         
-        # save initial weights
+        # save initial weights & get base criterion to select best model
         best_model_wts = copy.deepcopy(self.model.state_dict())
-        
-        # get base criterion to select best model
-        if 'max' in self.valid_type:
-            best_criterion = 0.0
-        else:
-            best_criterion = 100000000
-        
+        best_criterion = self._valid_contitioner()
+
         print('=' * 50)
         device_name = torch.cuda.get_device_name(int(self.device[-1]))
         print('Train start on device: {}'.format(device_name))
@@ -60,8 +55,7 @@ class BaseTrainer():
                                   valid_measure)
             
             # update best model weights
-            best_criterion, best_model_wts = self._get_best_valid(best_model_wts, 
-                                                                  best_criterion, 
+            best_criterion, best_model_wts = self._get_best_valid(best_criterion, 
                                                                   valid_measure,
                                                                   valid_loss)
             # result of current epoch
@@ -131,12 +125,22 @@ class BaseTrainer():
             self.scheduler.step()
         
         return round(epoch_loss, 4), round(epoch_measure, 4)
-
+    
+    def _valid_contitioner(self):
+        if 'max' in self.valid_type:
+            best_criterion = 0.0
+            
+        elif 'min' in self.valid_type:
+            best_criterion = 100000000
+        else:
+            best_criterion = None
+        
+        return best_criterion
+                
     def _get_best_valid(self, 
-                        best_model_wts, 
-                        best_criterion, 
-                        valid_measure, 
-                        valid_loss):
+                        best_criterion=None, 
+                        valid_measure=-1, 
+                        valid_loss=-1):
         
         if self.valid_type == 'max_measure':
             if valid_measure > best_criterion:
@@ -148,10 +152,14 @@ class BaseTrainer():
                 best_criterion = valid_measure
                 best_model_wts = copy.deepcopy(self.model.state_dict())
                 
-        elif self.valid_type == 'loss':
+        elif self.valid_type == 'min_loss':
             if valid_loss < best_criterion:
                 best_criterion = valid_loss
-                best_model_wts = copy.deepcopy(self.model.state_dict())        
+                best_model_wts = copy.deepcopy(self.model.state_dict())
+                
+        elif (self.valid_type == 'none') or (best_criterion == None):
+            # get last model if valid_type is not specified
+            best_model_wts = copy.deepdopy(self.model.state_dict())
         
         return best_criterion, best_model_wts
 
@@ -166,7 +174,7 @@ class BaseTrainer():
         raise NotImplementedError
     
     def _print_stat(self, epoch, num_epochs, epoch_elapse, train_loss, 
-                    train_measure, valid_loss, valid_measure):
+                    train_measure, valid_loss=-1, valid_measure=-1):
         
         for param_group in self.optimizer.param_groups:
             lr = param_group['lr']
@@ -206,3 +214,6 @@ class BaseTrainer():
     def _wandb_updater(self, epoch):
         # upload to wandb server
         wandb.log(self.results[int(epoch)], step=epoch)
+        
+        
+    
