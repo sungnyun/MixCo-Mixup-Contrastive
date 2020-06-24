@@ -1,4 +1,4 @@
-from models.SimCLR import ResNetSimCLR
+from models.SimCLR import SimCLR
 from trainers import *
 from eval_tools.lossfuncs import NTXentLoss
 from data_utils import data_loader

@@ -1,4 +1,4 @@
-import torch
+import torch, os
 from torchvision import datasets
 from torch.utils.data import Subset
 import torchvision.transforms as transforms
@@ -60,23 +60,22 @@ def data_loader(datasets, root, rep_augment=None, batch_size=128,
         transforms_dict = {'pretrain': RepLearnTransform(simclr_transform(mean[datasets], 
                                                                      std[datasets], 
                                                                      image_size[datasets], 1)), 
-                      'train': transforms.Compose([transforms.RandomCrop(image_size[datasets], 
-                                                                          padding=int(image_size[datasets]/8)),
+                      'train': transforms.Compose([transforms.RandomResizedCrop(image_size[datasets]),
                                                     transforms.RandomHorizontalFlip(),
                                                     transforms.ToTensor(),
                                                     transforms.Normalize(mean[datasets], std[datasets])]),
-                      'valid': transforms.Compose([transforms.CenterCrop(image_size[datasets] * 0.875),
-                                                   transforms.Resize(image_size[datasets]),
+                      'valid': transforms.Compose([transforms.Resize(256),
+                                                   transforms.CenterCrop(image_size[datasets]),
                                                    transforms.ToTensor(),
                                                    transforms.Normalize(mean[datasets], std[datasets])]),
-                      'test':  transforms.Compose([transforms.CenterCrop(image_size[datasets] * 0.875),
-                                                   transforms.Resize(image_size[datasets]),
+                      'test':  transforms.Compose([transforms.Resize(256),
+                                                   transforms.CenterCrop(image_size[datasets]),
                                                    transforms.ToTensor(),
                                                    transforms.Normalize(mean[datasets], std[datasets])])}
         dataset_paths = {'train': os.path.join(root, 'train'),
                          'test': os.path.join(root, 'val')}
         
-        dataloaders = imagenet_dataloader(dataset_paths, transforms_dict, batch_size, pin_memory, num_workers)
+        dataloaders, dataset_sizes = imagenet_dataloader(dataset_paths, transforms_dict, batch_size, pin_memory, num_workers)
 
         return dataloaders, dataset_sizes
     

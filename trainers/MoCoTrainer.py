@@ -115,7 +115,7 @@ class MoCoTrainer(BaseTrainer):
         return loss, measure * 100
 
         
-    def _step(self, inputs, labels):
+    def _step(self, inputs, labels, epoch=None):
         # augmented samples i
         xis = inputs[0].to(self.device)
         

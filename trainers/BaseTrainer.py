@@ -107,7 +107,7 @@ class BaseTrainer():
             # calculate gradients only in train phase
             with torch.set_grad_enabled(phase=='train'): 
                 # run a single step
-                loss, measure = self._step(inputs, labels)
+                loss, measure = self._step(inputs, labels, epoch)
 
                 # backward pass & update parameters
                 if phase == 'train':
@@ -165,7 +165,7 @@ class BaseTrainer():
         return best_criterion, best_model_wts
 
             
-    def _step(self, inputs, labels):
+    def _step(self, inputs, labels, epoch=None):
         """To be implemented"""
         raise NotImplementedError
     

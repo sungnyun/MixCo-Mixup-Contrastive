@@ -84,7 +84,7 @@ class SimCLRTrainer(BaseTrainer):
         return prober
     
         
-    def _step(self, inputs, labels):
+    def _step(self, inputs, labels, epoch=None):
         # augmented samples i
         xis = inputs[0].to(self.device)
         

@@ -8,6 +8,9 @@ from torchvision.datasets import ImageFolder
 from utils.utils import sample_weights, random_split_image_folder
 
 
+__all__ = ['imagenet_dataloader']
+
+
 def imagenet_dataloader(dataset_paths, transforms, batch_size, pin_memory, num_workers):
     datasets = {i: ImageFolder(root=dataset_paths[i]) for i in ['train', 'test']}
     #f_s_weights = sample_weights(datasets['train'].targets)
@@ -37,7 +40,7 @@ def imagenet_dataloader(dataset_paths, transforms, batch_size, pin_memory, num_w
     dataloaders = {i: DataLoader(datasets[i], sampler=config[i], 
                                  batch_size=batch_size, pin_memory=pin_memory, 
                                  num_workers=num_workers) for i in config.keys()}
-    dataset_sizes = {i: len(dataloaders[i]) for i in config.keys()}
+    dataset_sizes = {i: datasets[i].__len__() for i in config.keys()}
     
     return dataloaders, dataset_sizes
 
@@ -59,11 +62,11 @@ class CustomDataset(Dataset):
 
     def __getitem__(self, index):
         image = Image.open(self.data[index][0]).convert('RGB')
-        if self.pretrain:
-            img1, img2 = self.transform(image)
-            img = torch.cat([img, img2], dim=0)
-        else:
-            img = self.transform(image)
+        #if self.pretrain:
+        #    img1, img2 = self.transform(image)
+        #    img = torch.cat([img1, img2], dim=0)
+        #else:
+        img = self.transform(image)
 
         return img, self.labels[index].long()
 
