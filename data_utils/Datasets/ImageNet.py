@@ -33,6 +33,7 @@ def imagenet_dataloader(dataset_paths, transforms, batch_size, pin_memory, num_w
                                      transform=transforms['test'], pretrain=False)
     
     s_weights = sample_weights(datasets['pretrain'].labels)
+
     config = {'pretrain': WeightedRandomSampler(s_weights, num_samples=len(s_weights), replacement=True),
               'train': WeightedRandomSampler(s_weights, num_samples=len(s_weights), replacement=True),
               'test': None, 'valid': None}
