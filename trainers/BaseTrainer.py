@@ -32,9 +32,9 @@ class BaseTrainer():
         best_criterion = self._valid_contitioner()
 
         print('=' * 50)
-        device_name = torch.cuda.get_device_name(int(self.device[-1]))
-        print('Train start on device: {}'.format(device_name))
-        print('=' * 50, '\n')
+        # device_name = torch.cuda.get_device_name(int(self.device[-1]))
+        # print('Train start on device: {}'.format(device_name))
+        # print('=' * 50, '\n')
         
         for epoch in range(1, num_epochs+1):
             epoch_start = time.time()
@@ -95,7 +95,7 @@ class BaseTrainer():
                 
     def epoch_phase(self, phase, epoch=None):
         # set model train/eval phase
-        self.model.train() if phase == 'train' else self.model.eval()
+        self.model.train() if phase in ['train', 'pretrain'] else self.model.eval()
         
         # define loss and custom measure
         running_loss, running_measure = 0.0, 0.0
@@ -105,12 +105,12 @@ class BaseTrainer():
             self.optimizer.zero_grad() 
             
             # calculate gradients only in train phase
-            with torch.set_grad_enabled(phase=='train'): 
+            with torch.set_grad_enabled(phase in ['train', 'pretrain']): 
                 # run a single step
                 loss, measure = self._step(inputs, labels, epoch)
 
                 # backward pass & update parameters
-                if phase == 'train':
+                if phase in ['train', 'pretrain']:
                     loss.backward()
                     self.optimizer.step()
                 
@@ -122,7 +122,7 @@ class BaseTrainer():
         epoch_measure = running_measure / self.dataset_sizes[phase]
         
         # update learning rate if in train phase
-        if phase == 'train':
+        if phase in ['train', 'pretrain']:
             self.scheduler.step()
         
         return round(epoch_loss, 4), round(epoch_measure, 4)
@@ -196,7 +196,7 @@ class BaseTrainer():
         else:
             self.results[int(epoch)] = {**self.results[int(epoch)], **result_dict} # merge two dicts
             
-    def _result_saver(self, path):
+    def _result_saver(self, path, phase=None, model_state_dict=None):
         # if not exist, make directory
         directory_setter(path=path, make_dir=True)
         
@@ -204,6 +204,9 @@ class BaseTrainer():
         info_path = os.path.join(path, 'result_logs.json')
         with open(path, 'w') as fp:
             json.dump(self.results, fp)
+        if phase is not None:
+            model_path = os.path.join(path, 'model_{:s}.pth'.format(phase))
+            torch.save(model_path, model_state_dict)
         
     def _model_saver(self, path):
         # if not exist, make directory

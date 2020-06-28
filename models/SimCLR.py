@@ -36,6 +36,7 @@ class SimCLR(nn.Module):
             raise ("Invalid model name. Check the config file.")
 
     def forward(self, x):
+        import ipdb; ipdb.set_trace(context=15)
         h = self.features(x)
         h = h.squeeze()
 

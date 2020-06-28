@@ -12,17 +12,17 @@ class SimCLRTrainer(BaseTrainer):
         self.measure_name = 'Accuracy'
 
 
-    def train(self, num_epochs):
+    def train(self, num_epochs, phase='train'):
         # save initial weights & get base criterion to select best model
         best_model_wts = copy.deepcopy(self.model.state_dict())
         print('=' * 50)
-        device_name = torch.cuda.get_device_name(int(self.device[-1]))
-        print('Train start on device: {}'.format(device_name))
-        print('=' * 50, '\n')
+        # device_name = torch.cuda.get_device_name(int(self.device[-1]))
+        # print('Train start on device: {}'.format(device_name))
+        # print('=' * 50, '\n')
         
         for epoch in range(1, num_epochs+1):
             epoch_start = time.time()
-            train_loss, train_measure = self.epoch_phase('train', epoch)
+            train_loss, train_measure = self.epoch_phase(phase, epoch)
             epoch_elapse = round(time.time() - epoch_start, 3)
             
             self._print_stat(epoch, num_epochs, 
@@ -30,7 +30,7 @@ class SimCLRTrainer(BaseTrainer):
                                   train_loss, 
                                   train_measure)
             
-            best_model_wts = self._get_best_valid()
+            # best_model_wts = self._get_best_valid()
             result_dict = {
                 'Train_Loss': train_loss,
                 'epoch': epoch}
@@ -48,6 +48,7 @@ class SimCLRTrainer(BaseTrainer):
                 self._result_logger(epoch, result_dict)
             """
         best_model_wts = copy.deepcopy(self.model.state_dict())
+        self._result_saver(save_path, phase, best_model_wts)
 
     def test(self, save_path, do_probe=False, probe_setup=None):
         test_loss, test_measure = self.epoch_phase('test')
@@ -102,10 +103,11 @@ class SimCLRTrainer(BaseTrainer):
         
     def _inference(self, xis, xjs):            
         # get the representations and the projections
+        import ipdb; ipdb.set_trace(context=15)
         ris, zis = self.model(xis)  # [N,C]
 
         # get the representations and the projections
         rjs, zjs = self.model(xjs)  # [N,C]
-
+        
         return zis, zjs
     
