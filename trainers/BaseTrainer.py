@@ -117,7 +117,7 @@ class BaseTrainer():
                 # update results from steps
                 running_loss += loss.item()
                 running_measure += measure.item()
-        
+
         epoch_loss = running_loss / self.dataset_sizes[phase]
         epoch_measure = running_measure / self.dataset_sizes[phase]
         
@@ -185,8 +185,8 @@ class BaseTrainer():
               + '{:2.2f} '.format(train_measure) \
               + 'Learning Rate - {:0.6f}'.format(lr))
 
-        print(('[{}] Loss - {:.4f}, {} - '.format('Valid', valid_loss, self.measure_name)) \
-              + ('{:2.2f} '.format(valid_measure)))
+        # print(('[{}] Loss - {:.4f}, {} - '.format('Valid', valid_loss, self.measure_name)) \
+        #       + ('{:2.2f} '.format(valid_measure)))
     
         print('=' * 50)        
 

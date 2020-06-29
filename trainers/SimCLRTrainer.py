@@ -1,5 +1,6 @@
 import torch
 import time, copy
+from tqdm import tqdm
 from .BaseTrainer import BaseTrainer
 from .LinearProber import LinearProber
 
@@ -13,9 +14,9 @@ class SimCLRTrainer(BaseTrainer):
 
 
     def train(self, num_epochs, save_path, phase='train'):
+        pbar = tqdm(total=num_epochs, initial=1, bar_format="{desc:<5}{percentage:3.0f}%|{bar:10}{r_bar}")
         # save initial weights & get base criterion to select best model
         best_model_wts = copy.deepcopy(self.model.state_dict())
-        print('=' * 50)
         # device_name = torch.cuda.get_device_name(int(self.device[-1]))
         # print('Train start on device: {}'.format(device_name))
         # print('=' * 50, '\n')
@@ -25,11 +26,12 @@ class SimCLRTrainer(BaseTrainer):
             train_loss, train_measure = self.epoch_phase(phase, epoch)
             epoch_elapse = round(time.time() - epoch_start, 3)
             
-            self._print_stat(epoch, num_epochs, 
-                                  epoch_elapse,
-                                  train_loss, 
-                                  train_measure)
-            
+            # self._print_stat(epoch, num_epochs, 
+            #                       epoch_elapse,
+            #                       train_loss, 
+            #                       train_measure)
+            pbar.set_description(f'Train Loss: {train_loss:.4f}, {self.measure_name}: {train_measure:.6f}')
+            pbar.update(1)
             # best_model_wts = self._get_best_valid()
             result_dict = {
                 'Train_Loss': train_loss,
