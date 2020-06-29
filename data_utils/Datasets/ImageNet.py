@@ -40,7 +40,7 @@ def imagenet_dataloader(dataset_paths, transforms, batch_size, pin_memory, num_w
     
     dataloaders = {i: DataLoader(datasets[i], sampler=config[i], 
                                  batch_size=batch_size, pin_memory=pin_memory, 
-                                 num_workers=num_workers) for i in config.keys()}
+                                 num_workers=num_workers, drop_last=True) for i in config.keys()}
     dataset_sizes = {i: datasets[i].__len__() for i in config.keys()}
     
     return dataloaders, dataset_sizes
