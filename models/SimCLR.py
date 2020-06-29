@@ -4,6 +4,7 @@ import torch
 import torch.nn as nn
 import torch.nn.functional as F
 from .Architectures.ResNet import *
+import torchvision.models as models
 
 __all__ = ['SimCLR']
 
@@ -11,9 +12,8 @@ class SimCLR(nn.Module):
     def __init__(self, base_model, out_dim=128, from_small=False):
         super(SimCLR, self).__init__()
         self.encoder_dict = {
-            "resnet10": resnet10(from_small=from_small),
-            "resnet18": resnet18(from_small=from_small),
-            "resnet50": resnet50(from_small=from_small)}
+            "resnet18": models.resnet18(pretrained=False),
+            "resnet50": models.resnet50(pretrained=False)}
 
         encoder = self._get_basemodel(base_model)
         num_ftrs = encoder.fc.in_features
@@ -36,7 +36,6 @@ class SimCLR(nn.Module):
             raise ("Invalid model name. Check the config file.")
 
     def forward(self, x):
-        import ipdb; ipdb.set_trace(context=15)
         h = self.features(x)
         h = h.squeeze()
 

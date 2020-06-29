@@ -40,5 +40,5 @@ probe_setup = {'dataloaders': probe_loaders,
                'dataset_sizes': probe_sizes,
                'num_classes': 1000}
 
-trainer.train(num_epochs=args.epochs, phase='pretrain')
+trainer.train(num_epochs=args.epochs, save_path=args.save_dir, phase='pretrain')
 #trainer.test(save_path, do_probe=True, probe_setup=probe_setup)

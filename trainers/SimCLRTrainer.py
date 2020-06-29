@@ -12,7 +12,7 @@ class SimCLRTrainer(BaseTrainer):
         self.measure_name = 'Accuracy'
 
 
-    def train(self, num_epochs, phase='train'):
+    def train(self, num_epochs, save_path, phase='train'):
         # save initial weights & get base criterion to select best model
         best_model_wts = copy.deepcopy(self.model.state_dict())
         print('=' * 50)
@@ -103,7 +103,6 @@ class SimCLRTrainer(BaseTrainer):
         
     def _inference(self, xis, xjs):            
         # get the representations and the projections
-        import ipdb; ipdb.set_trace(context=15)
         ris, zis = self.model(xis)  # [N,C]
 
         # get the representations and the projections

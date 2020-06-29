@@ -8,6 +8,7 @@ parser.add_argument('--seed', type=int, default=0)
 parser.add_argument('--device', type=int, default=None, nargs='+')
 parser.add_argument('--num-workers', type=int, default=8)
 parser.add_argument('--dir-data', type=str, default='./data') 
+parser.add_argument('--save-dir', type=str, default='./save/test')
 
 # Training Options
 parser.add_argument('-d', '--dataset', type=str, default='imagenet', help='imagenet|cifar10|cifar100')
