@@ -14,6 +14,9 @@ class SimCLR(nn.Module):
         self.encoder_dict = {
             "resnet18": models.resnet18(pretrained=False),
             "resnet50": models.resnet50(pretrained=False)}
+            #"resnet18": resnet18(pretrained=False),
+            #"resnet50": resnet50(pretrained=False)}
+
 
         encoder = self._get_basemodel(base_model)
         num_ftrs = encoder.fc.in_features
@@ -23,6 +26,7 @@ class SimCLR(nn.Module):
         # projection MLP
         self.l1 = nn.Linear(num_ftrs, num_ftrs)
         self.l2 = nn.Linear(num_ftrs, out_dim)
+        self.relu = nn.ReLU()
         
         self.rep_dim = num_ftrs
         self.out_dim = out_dim
@@ -40,6 +44,6 @@ class SimCLR(nn.Module):
         h = h.squeeze()
 
         x = self.l1(h)
-        x = F.relu(x)
+        x = self.relu(x)
         x = self.l2(x)
         return h, x

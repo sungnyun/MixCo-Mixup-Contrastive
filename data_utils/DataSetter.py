@@ -5,6 +5,7 @@ import torchvision.transforms as transforms
 import random
 from .custom_transforms import *
 from .Datasets import *
+from torch.utils.data.distributed import DistributedSampler
 
 __all__ = ['data_loader']
 
@@ -31,8 +32,8 @@ image_num = {'cifar10': 50000, 'cifar100': 50000, 'tiny-imagenet': 100000, 'imag
 
 
 
-def data_loader(datasets, root, rep_augment=None, batch_size=128, 
-                valid_size=5000, pin_memory=False, num_workers=5, drop_last=True):
+def data_loader(datasets, root, rep_augment=None, batch_size=128, valid_size=5000, 
+                pin_memory=False, num_workers=5, drop_last=True, distributed=False):
         
     if rep_augment == 'simclr':
         rep_augment = simclr_transform(mean[datasets], std[datasets], image_size[datasets], 1)
@@ -75,7 +76,8 @@ def data_loader(datasets, root, rep_augment=None, batch_size=128,
         dataset_paths = {'train': os.path.join(root, 'train'),
                          'test': os.path.join(root, 'val')}
         
-        dataloaders, dataset_sizes = imagenet_dataloader(dataset_paths, transforms_dict, batch_size, pin_memory, num_workers)
+        dataloaders, dataset_sizes = imagenet_dataloader(dataset_paths, transforms_dict, batch_size, 
+                                                         pin_memory, num_workers, drop_last, distributed)
 
         return dataloaders, dataset_sizes
     
@@ -90,8 +92,14 @@ def data_loader(datasets, root, rep_augment=None, batch_size=128,
         train_set = Subset(train_set, train_list)
         valid_set = Subset(valid_set, valid_list)
         test_set = DataSet[datasets](root, train=False, transform=test_transforms, download=True)
+        
+        if distributed:
+            train_sampler = DistributedSampler(train_set)
+        else:
+            train_sampler = None
 
-        train_loader = torch.utils.data.DataLoader(train_set, batch_size=batch_size, shuffle=True, pin_memory=pin_memory, 
+        train_loader = torch.utils.data.DataLoader(train_set, batch_size=batch_size, shuffle=(train_sampler is None), 
+                                                   sampler=train_sampler, pin_memory=pin_memory, 
                                                    num_workers=num_workers, drop_last=drop_last)
         valid_loader = torch.utils.data.DataLoader(valid_set, batch_size=batch_size, shuffle=False, pin_memory=pin_memory, 
                                                    num_workers=num_workers, drop_last=drop_last)

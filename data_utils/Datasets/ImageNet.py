@@ -6,12 +6,13 @@ import torch
 from torch.utils.data import Dataset, DataLoader, WeightedRandomSampler
 from torchvision.datasets import ImageFolder
 from utils.utils import sample_weights, random_split_image_folder
+from torch.utils.data.distributed import DistributedSampler
 
 
 __all__ = ['imagenet_dataloader']
 
 
-def imagenet_dataloader(dataset_paths, transforms, batch_size, pin_memory, num_workers):
+def imagenet_dataloader(dataset_paths, transforms, batch_size, pin_memory, num_workers, drop_last, distributed):
     datasets = {i: ImageFolder(root=dataset_paths[i]) for i in ['train', 'test']}
     #f_s_weights = sample_weights(datasets['train'].targets)
     data, labels = random_split_image_folder(data=np.asarray(datasets['train'].samples),
@@ -34,13 +35,21 @@ def imagenet_dataloader(dataset_paths, transforms, batch_size, pin_memory, num_w
     
     s_weights = sample_weights(datasets['pretrain'].labels)
 
-    config = {'pretrain': WeightedRandomSampler(s_weights, num_samples=len(s_weights), replacement=True),
-              'train': WeightedRandomSampler(s_weights, num_samples=len(s_weights), replacement=True),
-              'test': None, 'valid': None}
-    
+    # config = {'pretrain': WeightedRandomSampler(s_weights, num_samples=len(s_weights), replacement=True),
+    #           'train': WeightedRandomSampler(s_weights, num_samples=len(s_weights), replacement=True),
+    #           'test': None, 'valid': None}
+    if distributed:
+        config = {'pretrain': DistributedSampler(datasets['pretrain']),
+                  'train': DistributedSampler(datasets['train']),
+                  'valid': None, 'test': None}
+    else: 
+        config = {'pretrain': WeightedRandomSampler(s_weights, num_samples=len(s_weights), replacement=True),
+                  'train': WeightedRandomSampler(s_weights, num_samples=len(s_weights), replacement=True),
+                  'test': None, 'valid': None}
+
     dataloaders = {i: DataLoader(datasets[i], sampler=config[i], 
                                  batch_size=batch_size, pin_memory=pin_memory, 
-                                 num_workers=num_workers, drop_last=True) for i in config.keys()}
+                                 num_workers=num_workers, drop_last=drop_last) for i in config.keys()}
     dataset_sizes = {i: datasets[i].__len__() for i in config.keys()}
     
     return dataloaders, dataset_sizes
