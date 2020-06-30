@@ -1,4 +1,7 @@
 # To process CORRUPT EXIF data warning, run this code.
+# apt update and install libpng, graphicsmagick
+# install imagemagick and convert png file to jpg. Refer to
+# https://discuss.pytorch.org/t/corrupt-exif-data-messages-when-training-imagenet/17313
 import glob
 import piexif
 

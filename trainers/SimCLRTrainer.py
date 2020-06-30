@@ -30,7 +30,7 @@ class SimCLRTrainer(BaseTrainer):
             #                       epoch_elapse,
             #                       train_loss, 
             #                       train_measure)
-            pbar.set_description(f'Train Loss: {train_loss:.4f}, {self.measure_name}: {train_measure:.6f}')
+            pbar.set_description(f'Train Loss: {train_loss:.6f}, {self.measure_name}: {train_measure:.4f}')
             pbar.update(1)
             # best_model_wts = self._get_best_valid()
             result_dict = {
