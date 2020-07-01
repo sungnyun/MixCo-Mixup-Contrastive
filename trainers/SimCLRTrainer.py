@@ -105,10 +105,11 @@ class SimCLRTrainer(BaseTrainer):
         
     def _inference(self, xis, xjs):            
         # get the representations and the projections
-        ris, zis = self.model(xis)  # [N,C]
+        rs, zs = self.model(xis, xjs)  # [2*N,C]
+        bsize = int(rs.size(0) / 2)
 
-        # get the representations and the projections
-        rjs, zjs = self.model(xjs)  # [N,C]
+        ris, zis = rs[:bsize], zs[:bsize]
+        rjs, zjs = rs[bsize:], zs[bsize:]
         
         return zis, zjs
     

@@ -39,11 +39,13 @@ class SimCLR(nn.Module):
         except:
             raise ("Invalid model name. Check the config file.")
 
-    def forward(self, x):
+    def forward(self, xi, xj):
+        x = torch.cat([xi, xj], dim=0)
         h = self.features(x)
         h = h.squeeze()
 
         x = self.l1(h)
         x = self.relu(x)
         x = self.l2(x)
+
         return h, x
