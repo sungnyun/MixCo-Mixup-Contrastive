@@ -40,7 +40,7 @@ def train(gpu, args):
                                 init_method=dist_url,
                                 world_size=args.world_size,
                                 rank=rank)
-        device = set_device(args)
+        device = set_device(gpu)
         model = DistributedDataParallel(model.to(device))
     else:
         device = set_device(args)
