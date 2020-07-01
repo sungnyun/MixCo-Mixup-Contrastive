@@ -15,12 +15,11 @@ import torch.optim.lr_scheduler as lr_scheduler
 import torch.distributed as dist
 
 
-device = set_device(args)
-ngpus_per_node = torch.cuda.device_count()
 model = SimCLR(base_model='resnet50', out_dim=args.proj_dim, from_small=True)
+
 if args.distributed:
-    rank = 1
-    nodes = 1
+    ngpus_per_node = torch.cuda.device_count()
+    nodes = 1  # default, 1 machine
     args.world_size = ngpus_per_node * nodes
 
     os.environ['MASTER_ADDR'] = '127.0.0.1'
@@ -61,6 +60,7 @@ def train(gpu, args):
 
     optimizer = optim.SGD(model.parameters(), lr=args.lr, momentum=0.9, weight_decay=1e-6)
     scheduler = lr_scheduler.CosineAnnealingLR(optimizer, T_max=args.epochs, eta_min=1e-5)
+    # TODO: check batch size -> in distributed setting, may be divided
     criterion = NTXentLoss(device, args.batch_size, args.temperature, use_cosine_similarity=True)
 
     trainer = SimCLRTrainer(model, dataloaders, dataset_sizes, criterion, optimizer, scheduler, device)
