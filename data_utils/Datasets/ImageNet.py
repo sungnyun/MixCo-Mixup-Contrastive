@@ -12,7 +12,7 @@ from torch.utils.data.distributed import DistributedSampler
 __all__ = ['imagenet_dataloader']
 
 
-def imagenet_dataloader(dataset_paths, transforms, batch_size, pin_memory, num_workers, drop_last, distributed):
+def imagenet_dataloader(dataset_paths, transforms, batch_size, pin_memory, num_workers, drop_last, distributed, num_replicas, rank):
     datasets = {i: ImageFolder(root=dataset_paths[i]) for i in ['train', 'test']}
     #f_s_weights = sample_weights(datasets['train'].targets)
     data, labels = random_split_image_folder(data=np.asarray(datasets['train'].samples),
@@ -39,8 +39,8 @@ def imagenet_dataloader(dataset_paths, transforms, batch_size, pin_memory, num_w
     #           'train': WeightedRandomSampler(s_weights, num_samples=len(s_weights), replacement=True),
     #           'test': None, 'valid': None}
     if distributed:
-        config = {'pretrain': DistributedSampler(datasets['pretrain']),
-                  'train': DistributedSampler(datasets['train']),
+        config = {'pretrain': DistributedSampler(datasets['pretrain'], num_replicas, rank),
+                  'train': DistributedSampler(datasets['train'], num_replicas, rank),
                   'valid': None, 'test': None}
     else: 
         config = {'pretrain': WeightedRandomSampler(s_weights, num_samples=len(s_weights), replacement=True),

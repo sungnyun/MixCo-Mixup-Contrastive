@@ -1,6 +1,18 @@
 import argparse
 import yaml
 
+
+def str2bool(v):
+    if isinstance(v, bool):
+       return v
+    if v.lower() in ('yes', 'true', 't', 'y', '1'):
+        return True
+    elif v.lower() in ('no', 'false', 'f', 'n', '0'):
+        return False
+    else:
+        raise argparse.ArgumentTypeError('Boolean value expected.')
+
+
 parser = argparse.ArgumentParser()
 
 # Configurations
@@ -9,7 +21,7 @@ parser.add_argument('--device', type=int, default=None, nargs='+')
 parser.add_argument('--num-workers', type=int, default=4)
 parser.add_argument('--dir-data', type=str, default='./data') 
 parser.add_argument('--save-dir', type=str, default='./save/test')
-parser.add_argument('--distributed', action='store_false', default=True)
+parser.add_argument('--distributed', type=str2bool, default=True)
 
 # Training Options
 parser.add_argument('-d', '--dataset', type=str, default='imagenet', help='imagenet|cifar10|cifar100')

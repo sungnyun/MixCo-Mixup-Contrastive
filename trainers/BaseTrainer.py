@@ -11,7 +11,7 @@ class BaseTrainer():
     """
     def __init__(self, model, dataloaders, dataset_sizes, criterion,
                 optimizer, scheduler, device, use_wandb=False):
-        self.model = model.to(device)
+        self.model = model
         self.dataloaders = dataloaders
         self.dataset_sizes = dataset_sizes
         self.criterion = criterion

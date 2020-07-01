@@ -33,7 +33,7 @@ image_num = {'cifar10': 50000, 'cifar100': 50000, 'tiny-imagenet': 100000, 'imag
 
 
 def data_loader(datasets, root, rep_augment=None, batch_size=128, valid_size=5000, 
-                pin_memory=False, num_workers=5, drop_last=True, distributed=False):
+                pin_memory=False, num_workers=5, drop_last=True, distributed=False, num_replicas=-1, rank=-1):
         
     if rep_augment == 'simclr':
         rep_augment = simclr_transform(mean[datasets], std[datasets], image_size[datasets], 1)
@@ -77,7 +77,7 @@ def data_loader(datasets, root, rep_augment=None, batch_size=128, valid_size=500
                          'test': os.path.join(root, 'val')}
         
         dataloaders, dataset_sizes = imagenet_dataloader(dataset_paths, transforms_dict, batch_size, 
-                                                         pin_memory, num_workers, drop_last, distributed)
+                                                         pin_memory, num_workers, drop_last, distributed, num_replicas, rank)
 
         return dataloaders, dataset_sizes
     
@@ -94,7 +94,7 @@ def data_loader(datasets, root, rep_augment=None, batch_size=128, valid_size=500
         test_set = DataSet[datasets](root, train=False, transform=test_transforms, download=True)
         
         if distributed:
-            train_sampler = DistributedSampler(train_set)
+            train_sampler = DistributedSampler(train_set, num_replicas, rank)
         else:
             train_sampler = None
 
