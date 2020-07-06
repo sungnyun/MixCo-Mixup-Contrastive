@@ -1,15 +1,13 @@
-# Refactored from https://github.com/sthalles/SimCLR
-
 import torch
 import torch.nn as nn
 import numpy as np
 import torch.nn.functional as F
 
 
-class NTXentLoss(nn.Module):
+class SimSoftLoss(nn.Module):
 
     def __init__(self, device, batch_size=128, temperature=1, use_cosine_similarity=True):
-        super(NTXentLoss, self).__init__()
+        super(SimSoftLoss, self).__init__(device, batch_size=128, temperature=1, use_cosine_similarity=True)
         self.batch_size = batch_size
         self.temperature = temperature
         self.device = device
@@ -18,37 +16,8 @@ class NTXentLoss(nn.Module):
         self.similarity_function = self._get_similarity_function(use_cosine_similarity)
         self.criterion = nn.CrossEntropyLoss(reduction="sum")
 
-    def _get_similarity_function(self, use_cosine_similarity):
-        if use_cosine_similarity:
-            self._cosine_similarity = nn.CosineSimilarity(dim=-1)
-            return self._cosine_simililarity
-        else:
-            return self._dot_simililarity
 
-    def _get_correlated_mask(self):
-        diag = np.eye(2 * self.batch_size)
-        l1 = np.eye((2 * self.batch_size), 2 * self.batch_size, k=-self.batch_size)
-        l2 = np.eye((2 * self.batch_size), 2 * self.batch_size, k=self.batch_size)
-        mask = torch.from_numpy((diag + l1 + l2))
-        mask = (1 - mask).type(torch.bool)
-        return mask.to(self.device)
-
-    @staticmethod
-    def _dot_simililarity(x, y):
-        v = torch.tensordot(x.unsqueeze(1), y.T.unsqueeze(0), dims=2)
-        # x shape: (N, 1, C)
-        # y shape: (1, C, 2N)
-        # v shape: (N, 2N)
-        return v
-
-    def _cosine_simililarity(self, x, y):
-        # x shape: (N, 1, C)
-        # y shape: (1, 2N, C)
-        # v shape: (N, 2N)
-        v = self._cosine_similarity(x.unsqueeze(1), y.unsqueeze(0))
-        return v
-
-    def forward(self, zis, zjs):
+    def forward(self, zis, zjs, epoch):
         zis = F.normalize(zis, dim=1)
         zjs = F.normalize(zjs, dim=1)
         
