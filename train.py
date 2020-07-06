@@ -1,6 +1,6 @@
 from models.SimCLR import SimCLR
 from trainers import *
-from eval_tools.lossfuncs import NTXentLoss
+from utils.lossfuncs import NTXentLoss
 from data_utils import data_loader
 from utils.utils import set_device
 from config import args

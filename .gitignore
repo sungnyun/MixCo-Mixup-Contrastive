@@ -1,7 +1,6 @@
 ILSVRC*
 wandb/
 data/
-kd_weights/
 results/
 .ipynb_checkpoints/
 __pycache__/
