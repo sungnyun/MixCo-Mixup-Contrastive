@@ -6,9 +6,13 @@ import torch
 from torch.utils.data import Dataset, DataLoader, WeightedRandomSampler
 from torchvision.datasets import ImageFolder
 from utils.utils import sample_weights, random_split_image_folder
+from torch.utils.data.distributed import DistributedSampler
 
 
-def imagenet_dataloader(dataset_paths, transforms, batch_size, pin_memory, num_workers):
+__all__ = ['imagenet_dataloader']
+
+
+def imagenet_dataloader(dataset_paths, transforms, batch_size, pin_memory, num_workers, drop_last, distributed, num_replicas, rank):
     datasets = {i: ImageFolder(root=dataset_paths[i]) for i in ['train', 'test']}
     #f_s_weights = sample_weights(datasets['train'].targets)
     data, labels = random_split_image_folder(data=np.asarray(datasets['train'].samples),
@@ -30,14 +34,25 @@ def imagenet_dataloader(dataset_paths, transforms, batch_size, pin_memory, num_w
                                      transform=transforms['test'], pretrain=False)
     
     s_weights = sample_weights(datasets['pretrain'].labels)
-    config = {'pretrain': WeightedRandomSampler(s_weights, num_samples=len(s_weights), replacement=True),
-              'train': WeightedRandomSampler(s_weights, num_samples=len(s_weights), replacement=True),
-              'test': None, 'valid': None}
-    
+
+    # config = {'pretrain': WeightedRandomSampler(s_weights, num_samples=len(s_weights), replacement=True),
+    #           'train': WeightedRandomSampler(s_weights, num_samples=len(s_weights), replacement=True),
+    #           'test': None, 'valid': None}
+    if distributed:
+        config = {'pretrain': DistributedSampler(datasets['pretrain'], num_replicas, rank),
+                  'train': DistributedSampler(datasets['train'], num_replicas, rank),
+                  'valid': None, 'test': None}
+    else: 
+        config = {'pretrain': WeightedRandomSampler(s_weights, num_samples=len(s_weights), replacement=True),
+                  'train': WeightedRandomSampler(s_weights, num_samples=len(s_weights), replacement=True),
+                  'test': None, 'valid': None}
+
     dataloaders = {i: DataLoader(datasets[i], sampler=config[i], 
                                  batch_size=batch_size, pin_memory=pin_memory, 
-                                 num_workers=num_workers) for i in config.keys()}
-    return dataloaders
+                                 num_workers=num_workers, drop_last=drop_last) for i in config.keys()}
+    dataset_sizes = {i: datasets[i].__len__() for i in config.keys()}
+    
+    return dataloaders, dataset_sizes
 
 
 class CustomDataset(Dataset):
@@ -57,11 +72,11 @@ class CustomDataset(Dataset):
 
     def __getitem__(self, index):
         image = Image.open(self.data[index][0]).convert('RGB')
-        if self.pretrain:
-            img1, img2 = self.transform(image)
-            img = torch.cat([img, img2], dim=0)
-        else:
-            img = self.transform(image)
+        #if self.pretrain:
+        #    img1, img2 = self.transform(image)
+        #    img = torch.cat([img1, img2], dim=0)
+        #else:
+        img = self.transform(image)
 
         return img, self.labels[index].long()
 

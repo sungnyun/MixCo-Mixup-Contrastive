@@ -1,6 +1,7 @@
 import torch
 import os, copy, time
 import json
+import numpy as np
 #import wandb
 from .utils import directory_setter
 
@@ -10,7 +11,7 @@ class BaseTrainer():
     """
     def __init__(self, model, dataloaders, dataset_sizes, criterion,
                 optimizer, scheduler, device, use_wandb=False):
-        self.model = model.to(device)
+        self.model = model
         self.dataloaders = dataloaders
         self.dataset_sizes = dataset_sizes
         self.criterion = criterion
@@ -31,9 +32,9 @@ class BaseTrainer():
         best_criterion = self._valid_contitioner()
 
         print('=' * 50)
-        device_name = torch.cuda.get_device_name(int(self.device[-1]))
-        print('Train start on device: {}'.format(device_name))
-        print('=' * 50, '\n')
+        # device_name = torch.cuda.get_device_name(int(self.device[-1]))
+        # print('Train start on device: {}'.format(device_name))
+        # print('=' * 50, '\n')
         
         for epoch in range(1, num_epochs+1):
             epoch_start = time.time()
@@ -94,7 +95,7 @@ class BaseTrainer():
                 
     def epoch_phase(self, phase, epoch=None):
         # set model train/eval phase
-        self.model.train() if phase == 'train' else self.model.eval()
+        self.model.train() if phase in ['train', 'pretrain'] else self.model.eval()
         
         # define loss and custom measure
         running_loss, running_measure = 0.0, 0.0
@@ -104,34 +105,34 @@ class BaseTrainer():
             self.optimizer.zero_grad() 
             
             # calculate gradients only in train phase
-            with torch.set_grad_enabled(phase=='train'): 
+            with torch.set_grad_enabled(phase in ['train', 'pretrain']): 
                 # run a single step
-                loss, measure = self._step(inputs, labels)
+                loss, measure = self._step(inputs, labels, epoch)
 
                 # backward pass & update parameters
-                if phase == 'train':
+                if phase in ['train', 'pretrain']:
                     loss.backward()
                     self.optimizer.step()
                 
                 # update results from steps
                 running_loss += loss.item()
                 running_measure += measure.item()
-        
+
         epoch_loss = running_loss / self.dataset_sizes[phase]
         epoch_measure = running_measure / self.dataset_sizes[phase]
         
         # update learning rate if in train phase
-        if phase == 'train':
+        if phase in ['train', 'pretrain']:
             self.scheduler.step()
         
         return round(epoch_loss, 4), round(epoch_measure, 4)
     
     def _valid_contitioner(self):
         if 'max' in self.valid_type:
-            best_criterion = 0.0
+            best_criterion = -np.inf
             
         elif 'min' in self.valid_type:
-            best_criterion = 100000000
+            best_criterion = np.inf
         else:
             best_criterion = None
         
@@ -139,8 +140,8 @@ class BaseTrainer():
                 
     def _get_best_valid(self, 
                         best_criterion=None, 
-                        valid_measure=-1, 
-                        valid_loss=-1):
+                        valid_measure=0, 
+                        valid_loss=0):
         
         if self.valid_type == 'max_measure':
             if valid_measure > best_criterion:
@@ -159,12 +160,12 @@ class BaseTrainer():
                 
         elif (self.valid_type == 'none') or (best_criterion == None):
             # get last model if valid_type is not specified
-            best_model_wts = copy.deepdopy(self.model.state_dict())
+            best_model_wts = copy.deepcopy(self.model.state_dict())
         
         return best_criterion, best_model_wts
 
             
-    def _step(self, inputs, labels):
+    def _step(self, inputs, labels, epoch=None):
         """To be implemented"""
         raise NotImplementedError
     
@@ -174,7 +175,7 @@ class BaseTrainer():
         raise NotImplementedError
     
     def _print_stat(self, epoch, num_epochs, epoch_elapse, train_loss, 
-                    train_measure, valid_loss=-1, valid_measure=-1):
+                    train_measure, valid_loss=0, valid_measure=0):
         
         for param_group in self.optimizer.param_groups:
             lr = param_group['lr']
@@ -184,8 +185,8 @@ class BaseTrainer():
               + '{:2.2f} '.format(train_measure) \
               + 'Learning Rate - {:0.6f}'.format(lr))
 
-        print(('[{}] Loss - {:.4f}, {} - '.format('Valid', valid_loss, self.measure_name)) \
-              + ('{:2.2f} '.format(valid_measure)))
+        # print(('[{}] Loss - {:.4f}, {} - '.format('Valid', valid_loss, self.measure_name)) \
+        #       + ('{:2.2f} '.format(valid_measure)))
     
         print('=' * 50)        
 
@@ -195,7 +196,7 @@ class BaseTrainer():
         else:
             self.results[int(epoch)] = {**self.results[int(epoch)], **result_dict} # merge two dicts
             
-    def _result_saver(self, path):
+    def _result_saver(self, path, phase=None, model_state_dict=None):
         # if not exist, make directory
         directory_setter(path=path, make_dir=True)
         
@@ -203,6 +204,9 @@ class BaseTrainer():
         info_path = os.path.join(path, 'result_logs.json')
         with open(path, 'w') as fp:
             json.dump(self.results, fp)
+        if phase is not None:
+            model_path = os.path.join(path, 'model_{:s}.pth'.format(phase))
+            torch.save(model_path, model_state_dict)
         
     def _model_saver(self, path):
         # if not exist, make directory

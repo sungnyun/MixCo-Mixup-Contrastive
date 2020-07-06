@@ -1,38 +1,36 @@
 import torch
 import time, copy
-from tqdm import tqdm
 from .BaseTrainer import BaseTrainer
 from .LinearProber import LinearProber
 
-class SimCLRTrainer(BaseTrainer):
-    """SimCLR Trainer"""
+class MoCoTrainer(BaseTrainer):
+    """MoCo Trainer"""
     def __init__(self, model, dataloaders, dataset_sizes, criterion,
                 optimizer, scheduler, device, use_wandb=False):
-        super(SimCLRTrainer, self).__init__(model, dataloaders, dataset_sizes, criterion, 
+        super(MoCoTrainer, self).__init__(model, dataloaders, dataset_sizes, criterion, 
                                             optimizer, scheduler, device, use_wandb)
+
         self.measure_name = 'Accuracy'
+        self.criterion = torch.nn.CrossEntropyLoss()
+        self.prediction = lambda outputs : torch.max(outputs, 1)[1]
 
 
-    def train(self, num_epochs, save_path, phase='train'):
-        pbar = tqdm(total=num_epochs, initial=1, bar_format="{desc:<5}{percentage:3.0f}%|{bar:10}{r_bar}")
-        # save initial weights & get base criterion to select best model
-        best_model_wts = copy.deepcopy(self.model.state_dict())
-        # device_name = torch.cuda.get_device_name(int(self.device[-1]))
-        # print('Train start on device: {}'.format(device_name))
-        # print('=' * 50, '\n')
+    def train(self, num_epochs):        
+        print('=' * 50)
+        device_name = torch.cuda.get_device_name(int(self.device[-1]))
+        print('Train start on device: {}'.format(device_name))
+        print('=' * 50, '\n')
         
         for epoch in range(1, num_epochs+1):
             epoch_start = time.time()
-            train_loss, train_measure = self.epoch_phase(phase, epoch)
+            train_loss, train_measure = self.epoch_phase('train', epoch)
             epoch_elapse = round(time.time() - epoch_start, 3)
             
-            # self._print_stat(epoch, num_epochs, 
-            #                       epoch_elapse,
-            #                       train_loss, 
-            #                       train_measure)
-            pbar.set_description(f'Train Loss: {train_loss:.6f}, {self.measure_name}: {train_measure:.4f}')
-            pbar.update(1)
-            # best_model_wts = self._get_best_valid()
+            self._print_stat(epoch, num_epochs, 
+                                  epoch_elapse,
+                                  train_loss, 
+                                  train_measure)
+            
             result_dict = {
                 'Train_Loss': train_loss,
                 'epoch': epoch}
@@ -41,16 +39,18 @@ class SimCLRTrainer(BaseTrainer):
             """
             if (probe_freq is not None) and (epoch % probe_freq == 0):
                 prober = self._set_prober(probe_setup)
-                t_prob_loss, t_prob_acc1 = result = prober.train()
+                t_prob_loss, t_prob_acc1, v_prob_loss, v_prob_acc1, v_prob_acc5 = result = prober.train()
                 result_dict = {
                     'Train_ProbLoss': t_prob_loss,
                     'Train_ProbAccuracy1': t_prob_acc1,
+                    'Valid_ProbLoss': v_prob_loss,
+                    'Valid_ProbAccuracy1': v_prob_acc1,
+                    'Valid_ProbAccuracy5': v_prob_acc5,
                     'epoch': epoch}
                 
                 self._result_logger(epoch, result_dict)
             """
         best_model_wts = copy.deepcopy(self.model.state_dict())
-        self._result_saver(save_path, phase, best_model_wts)
 
     def test(self, save_path, do_probe=False, probe_setup=None):
         test_loss, test_measure = self.epoch_phase('test')
@@ -86,6 +86,34 @@ class SimCLRTrainer(BaseTrainer):
         self.prober = prober
         return prober
     
+    
+    def _ntxentloss(self, zis, zjs):
+        # compute logits
+        # Einstein sum is more intuitive
+        # positive logits: Nx1
+        l_pos = torch.einsum('nc,nc->n', [zis, zjs]).unsqueeze(-1)
+        # negative logits: NxK
+        l_neg = torch.einsum('nc,ck->nk', [zis, self.model.queue.clone().detach()])
+
+        # logits: Nx(1+K)
+        logits = torch.cat([l_pos, l_neg], dim=1)
+        # apply temperature
+        logits /= self.model.T
+
+        # labels: positive key indicators
+        labels = torch.zeros(logits.shape[0], dtype=torch.long).cuda().to(self.device)
+        
+        # dequeue and enqueue
+        self.model._dequeue_and_enqueue(zjs)
+        
+        loss = self.criterion(logits, labels)
+        #loss /= logits.shape[1]
+        
+        pred = self.prediction(logits)
+        measure = torch.sum(pred == labels.data)
+
+        return loss, measure * 100
+
         
     def _step(self, inputs, labels, epoch=None):
         # augmented samples i
@@ -98,18 +126,14 @@ class SimCLRTrainer(BaseTrainer):
         zis, zjs = self._inference(xis, xjs)
         
         # calculate loss. note that (batchsize *2)
-        loss, measure = self.criterion(zis, zjs)
+        loss, measure = self._ntxentloss(zis, zjs)
         
-        return loss, measure * 100
+        return loss, measure
         
         
     def _inference(self, xis, xjs):            
         # get the representations and the projections
-        rs, zs = self.model(xis, xjs)  # [2*N,C]
-        bsize = int(rs.size(0) / 2)
+        _, [zis, zjs] = self.model(xis, xjs)
 
-        ris, zis = rs[:bsize], zs[:bsize]
-        rjs, zjs = rs[bsize:], zs[bsize:]
-        
         return zis, zjs
     

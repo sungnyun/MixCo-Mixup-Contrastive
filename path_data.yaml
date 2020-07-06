@@ -1,2 +1,2 @@
-dir_imagenet = '/home/deepspeed/data/ILSVRC2015/Data/CLS-LOC'
+dir_imagenet: '/home/deepspeed/hynix/ER-hynix/data/ILSVRC2015/Data/CLS-LOC'
 
