@@ -13,7 +13,7 @@ class SimCLRTrainer(BaseTrainer):
         self.measure_name = 'Accuracy'
 
 
-    def train(self, num_epochs, save_path, phase='train'):
+    def train(self, num_epochs, save_path, phase='pretrain'):
         pbar = tqdm(total=num_epochs, initial=1, bar_format="{desc:<5}{percentage:3.0f}%|{bar:10}{r_bar}")
         # save initial weights & get base criterion to select best model
         best_model_wts = copy.deepcopy(self.model.state_dict())

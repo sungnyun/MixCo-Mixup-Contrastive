@@ -16,13 +16,8 @@ class NTXentLoss(nn.Module):
         self.softmax = nn.Softmax(dim=-1)
         self.mask_samples_from_same_repr = self._get_correlated_mask().type(torch.bool)
         self.similarity_function = self._get_similarity_function(use_cosine_similarity)
-<<<<<<< HEAD
-        self.criterion = nn.CrossEntropyLoss(reduction="sum")
-=======
-        #self.criterion = torch.nn.CrossEntropyLoss(reduction="sum")
         self.criterion = torch.nn.CrossEntropyLoss().to(self.device)
         self.prediction = lambda outputs : torch.max(outputs, 1)[1]
->>>>>>> 67bb5b1696cc780daa2770a7df71acfa1bb60636
 
     def _get_similarity_function(self, use_cosine_similarity):
         if use_cosine_similarity:

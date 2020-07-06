@@ -33,7 +33,7 @@ image_num = {'cifar10': 50000, 'cifar100': 50000, 'tiny-imagenet': 100000, 'imag
 
 
 def data_loader(datasets, root, rep_augment=None, batch_size=128, valid_size=5000, 
-                pin_memory=False, num_workers=5, drop_last=True, distributed=False, num_replicas=-1, rank=-1):
+                pin_memory=False, num_workers=5, drop_last=True, distributed=False, num_replicas=None, rank=None):
         
     if rep_augment == 'simclr':
         rep_augment = simclr_transform(mean[datasets], std[datasets], image_size[datasets], 1)
@@ -82,32 +82,33 @@ def data_loader(datasets, root, rep_augment=None, batch_size=128, valid_size=500
         return dataloaders, dataset_sizes
     
     else:
-        valid_transforms = test_transforms if rep_augment is None else train_transforms
-
         train_set = DataSet[datasets](root, train=True, transform=train_transforms, download=True)
-        valid_set = DataSet[datasets](root, train=True, transform=valid_transforms, download=True)
+        valid_set = DataSet[datasets](root, train=True, transform=test_transforms, download=True)
 
         train_list, valid_list = _valid_sampler(datasets, valid_size)
 
-        train_set = Subset(train_set, train_list)
-        valid_set = Subset(valid_set, valid_list)
+        probe_train_set = Subset(train_set, train_list)
+        probe_valid_set = Subset(valid_set, valid_list)
         test_set = DataSet[datasets](root, train=False, transform=test_transforms, download=True)
         
         if distributed:
             train_sampler = DistributedSampler(train_set, num_replicas, rank)
         else:
             train_sampler = None
-
-        train_loader = torch.utils.data.DataLoader(train_set, batch_size=batch_size, shuffle=(train_sampler is None), 
+        
+        pretrain_loader = torch.utils.data.DataLoader(train_set, batch_size=batch_size, shuffle=(train_sampler is None), 
                                                    sampler=train_sampler, pin_memory=pin_memory, 
                                                    num_workers=num_workers, drop_last=drop_last)
-        valid_loader = torch.utils.data.DataLoader(valid_set, batch_size=batch_size, shuffle=False, pin_memory=pin_memory, 
+        train_loader = torch.utils.data.DataLoader(probe_train_set, batch_size=batch_size, shuffle=(train_sampler is None), 
+                                                   sampler=train_sampler, pin_memory=pin_memory, 
+                                                   num_workers=num_workers, drop_last=drop_last)
+        valid_loader = torch.utils.data.DataLoader(probe_valid_set, batch_size=batch_size, shuffle=False, pin_memory=pin_memory, 
                                                    num_workers=num_workers, drop_last=drop_last)
         test_loader = torch.utils.data.DataLoader(test_set, batch_size=batch_size, shuffle=False, pin_memory=pin_memory, 
                                                    num_workers=num_workers, drop_last=drop_last)
 
-        dataloaders = {'train' : train_loader, 'valid' : valid_loader, 'test' : test_loader}
-        dataset_sizes = {'train': len(train_set), 'valid' : len(valid_set), 'test' : len(test_set)}
+        dataloaders = {'pretrain': pretrain_loader, 'train': train_loader, 'valid' : valid_loader, 'test' : test_loader}
+        dataset_sizes = {'pretrain': len(train_set), 'train': len(probe_train_set), 'valid' : len(probe_valid_set), 'test' : len(test_set)}
 
         return dataloaders, dataset_sizes
 

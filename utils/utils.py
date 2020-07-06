@@ -14,7 +14,7 @@ def set_device(args):
 
     os.environ["CUDA_DEVICE_ORDER"]="PCI_BUS_ID"
     os.environ['CUDA_VISIBLE_DEVICES'] = device
-
+    print(torch.device('cuda'))
     return torch.device('cuda')
 
 

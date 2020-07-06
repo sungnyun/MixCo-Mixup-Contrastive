@@ -14,22 +14,9 @@ import torch.multiprocessing as mp
 import torch.optim.lr_scheduler as lr_scheduler
 import torch.distributed as dist
 
-
-model = SimCLR(base_model='resnet50', out_dim=args.proj_dim, from_small=True)
-
-if args.distributed:
-    ngpus_per_node = torch.cuda.device_count()
-    nodes = 1  # default, 1 machine
-    args.world_size = ngpus_per_node * nodes
-
-    os.environ['MASTER_ADDR'] = '127.0.0.1'
-    os.environ['MASTER_PORT'] = '29500'
-
-    mp.spawn(train, nprocs=ngpus_per_node, args=(args,))
-else:
-    train(None, args)
-
 def train(gpu, args):
+    model = SimCLR(base_model=args.model, out_dim=args.proj_dim, from_small=True)
+
     if gpu is not None:
         print("Use GPU: {} for training".format(gpu))
 
@@ -56,7 +43,7 @@ def train(gpu, args):
                                              drop_last=True,
                                              distributed=args.distributed,
                                              num_replicas=args.world_size,
-                                             rank=rank)
+                                             rank=args.rank)
 
     optimizer = optim.SGD(model.parameters(), lr=args.lr, momentum=0.9, weight_decay=1e-6)
     scheduler = lr_scheduler.CosineAnnealingLR(optimizer, T_max=args.epochs, eta_min=1e-5)
@@ -76,3 +63,18 @@ def train(gpu, args):
 
     trainer.train(num_epochs=args.epochs, save_path=args.save_dir, phase='pretrain')
     #trainer.test(save_path, do_probe=True, probe_setup=probe_setup)
+
+
+if args.distributed:
+    ngpus_per_node = torch.cuda.device_count()
+    nodes = 1  # default, 1 machine
+    args.world_size = ngpus_per_node * nodes
+
+    os.environ['MASTER_ADDR'] = '127.0.0.1'
+    os.environ['MASTER_PORT'] = '29500'
+
+    mp.spawn(train, nprocs=ngpus_per_node, args=(args,))
+else:
+    args.world_size = None
+    args.rank = None
+    train(None, args)

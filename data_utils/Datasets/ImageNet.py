@@ -12,7 +12,7 @@ from torch.utils.data.distributed import DistributedSampler
 __all__ = ['imagenet_dataloader']
 
 
-def imagenet_dataloader(dataset_paths, transforms, batch_size, pin_memory, num_workers, drop_last, distributed, num_replicas, rank):
+def imagenet_dataloader(dataset_paths, transforms, batch_size, pin_memory, num_workers, drop_last, distributed, num_replicas=None, rank=None):
     datasets = {i: ImageFolder(root=dataset_paths[i]) for i in ['train', 'test']}
     #f_s_weights = sample_weights(datasets['train'].targets)
     data, labels = random_split_image_folder(data=np.asarray(datasets['train'].samples),
