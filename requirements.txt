@@ -1,5 +1,0 @@
-opencv-python
-umap-learn
-matplotlib
-tqdm
-
