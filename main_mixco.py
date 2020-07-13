@@ -94,7 +94,10 @@ parser.add_argument('--moco-t', default=0.07, type=float,
 parser.add_argument('--moco-alpha', default=1.0, type=float,
                     help='mixup alpha (default: 1.0)')
 
-parser.add_argument('--mix-hyper', default=0.005, type=float,
+parser.add_argument('--exp-name', default='test', type=str,
+                    help='experiment_name')
+
+parser.add_argument('--mix-hyper', default=0.05, type=float,
                     help='mixup loss hyperparameter (default: 0.00005)')
 # options for moco v2
 parser.add_argument('--mlp', action='store_true',
@@ -280,7 +283,7 @@ def main_worker(gpu, ngpus_per_node, args):
                 'arch': args.arch,
                 'state_dict': model.state_dict(),
                 'optimizer' : optimizer.state_dict(),
-            }, is_best=False, filename='checkpoint_{:04d}.pth.tar'.format(epoch))
+            }, is_best=False, filename=args.exp_name+'.pth.tar'.format(epoch))
 
 
 def train(train_loader, model, criterion, optimizer, epoch, args):
