@@ -25,6 +25,11 @@ import torchvision.models as models
 import moco.loader
 import moco.builder
 
+import mixco.builder
+import mixco.loader
+
+from Datasets import *
+
 model_names = sorted(name for name in models.__dict__
     if name.islower() and not name.startswith("__")
     and callable(models.__dict__[name]))
@@ -79,17 +84,15 @@ parser.add_argument('--multiprocessing-distributed', action='store_true',
                          'fastest way to use PyTorch for either single node or '
                          'multi node data parallel training')
 
-# moco specific configs:
-parser.add_argument('--moco-dim', default=128, type=int,
+# mixco specific configs:
+parser.add_argument('--mixco-dim', default=128, type=int,
                     help='feature dimension (default: 128)')
-parser.add_argument('--moco-k', default=65536, type=int,
-                    help='queue size; number of negative keys (default: 65536)')
-parser.add_argument('--moco-m', default=0.999, type=float,
-                    help='moco momentum of updating key encoder (default: 0.999)')
-parser.add_argument('--moco-t', default=0.07, type=float,
+parser.add_argument('--mixco-t', default=0.07, type=float,
                     help='softmax temperature (default: 0.07)')
-
-# options for moco v2
+parser.add_argument('--mixco-alpha', default=1.0, type=float,
+                    help='beta dist alpha (default: 1.0)')
+parser.add_argument('--mixco-eps', default=0.0, type=float,
+                    help='LS epsilon (default: 0.0)')
 parser.add_argument('--mlp', action='store_true',
                     help='use mlp head')
 parser.add_argument('--aug-plus', action='store_true',
@@ -156,9 +159,9 @@ def main_worker(gpu, ngpus_per_node, args):
                                 world_size=args.world_size, rank=args.rank)
     # create model
     print("=> creating model '{}'".format(args.arch))
-    model = moco.builder.MoCo(
+    model = mixco.builder.MixCo(
         models.__dict__[args.arch],
-        args.moco_dim, args.moco_k, args.moco_m, args.moco_t, args.mlp)
+        args.mixco_dim, args.mixco_t, args.mixco_alpha, args.mixco_eps, args.mlp)
     print(model)
 
     if args.distributed:
@@ -217,7 +220,7 @@ def main_worker(gpu, ngpus_per_node, args):
     cudnn.benchmark = True
 
     # Data loading code
-    traindir = os.path.join(args.data, 'train')
+    #traindir = os.path.join(args.data, 'train')
     normalize = transforms.Normalize(mean=[0.485, 0.456, 0.406],
                                      std=[0.229, 0.224, 0.225])
     if args.aug_plus:
@@ -244,9 +247,10 @@ def main_worker(gpu, ngpus_per_node, args):
             normalize
         ]
 
-    train_dataset = datasets.ImageFolder(
-        traindir,
-        moco.loader.TwoCropsTransform(transforms.Compose(augmentation)))
+    train_dataset = TinyImageNet(args.data, transform=moco.loader.TwoCropsTransform(transforms.Compose(augmentation)))
+    #train_dataset = datasets.ImageFolder(
+    #    traindir,
+    #    moco.loader.TwoCropsTransform(transforms.Compose(augmentation)))
 
     if args.distributed:
         train_sampler = torch.utils.data.distributed.DistributedSampler(train_dataset)
@@ -299,8 +303,12 @@ def train(train_loader, model, criterion, optimizer, epoch, args):
             images[1] = images[1].cuda(args.gpu, non_blocking=True)
 
         # compute output
-        output, target = model(im_q=images[0], im_k=images[1])
-        loss = criterion(output, target)
+        output, target = model(im_a=images[0], im_b=images[1])
+        
+        lsm = nn.functional.log_softmax(output, dim=1)
+        loss = -(target * lsm).sum(dim=1).mean()
+        target = target.max(dim=1)[1]
+        #loss = criterion(output, target)
 
         # acc1/acc5 are (K+1)-way contrast classifier accuracy
         # measure accuracy and record loss

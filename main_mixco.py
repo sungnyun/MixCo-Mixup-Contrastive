@@ -12,6 +12,7 @@ import warnings
 import torch
 import torch.nn as nn
 import torch.nn.parallel
+import torch.nn.functional as F
 import torch.backends.cudnn as cudnn
 import torch.distributed as dist
 import torch.optim
@@ -22,11 +23,8 @@ import torchvision.transforms as transforms
 import torchvision.datasets as datasets
 import torchvision.models as models
 
-import moco.loader
-import moco.builder
-
-import mixco.builder
 import mixco.loader
+import mixco.builder
 
 from Datasets import *
 
@@ -84,15 +82,21 @@ parser.add_argument('--multiprocessing-distributed', action='store_true',
                          'fastest way to use PyTorch for either single node or '
                          'multi node data parallel training')
 
-# mixco specific configs:
-parser.add_argument('--mixco-dim', default=128, type=int,
+# moco specific configs:
+parser.add_argument('--moco-dim', default=128, type=int,
                     help='feature dimension (default: 128)')
-parser.add_argument('--mixco-t', default=0.07, type=float,
+parser.add_argument('--moco-k', default=65536, type=int,
+                    help='queue size; number of negative keys (default: 65536)')
+parser.add_argument('--moco-m', default=0.999, type=float,
+                    help='moco momentum of updating key encoder (default: 0.999)')
+parser.add_argument('--moco-t', default=0.07, type=float,
                     help='softmax temperature (default: 0.07)')
-parser.add_argument('--mixco-alpha', default=1.0, type=float,
-                    help='beta dist alpha (default: 1.0)')
-parser.add_argument('--mixco-eps', default=0.0, type=float,
-                    help='LS epsilon (default: 0.0)')
+parser.add_argument('--moco-alpha', default=1.0, type=float,
+                    help='mixup alpha (default: 1.0)')
+
+parser.add_argument('--mix-hyper', default=0.005, type=float,
+                    help='mixup loss hyperparameter (default: 0.00005)')
+# options for moco v2
 parser.add_argument('--mlp', action='store_true',
                     help='use mlp head')
 parser.add_argument('--aug-plus', action='store_true',
@@ -161,7 +165,7 @@ def main_worker(gpu, ngpus_per_node, args):
     print("=> creating model '{}'".format(args.arch))
     model = mixco.builder.MixCo(
         models.__dict__[args.arch],
-        args.mixco_dim, args.mixco_t, args.mixco_alpha, args.mixco_t, args.mlp)
+        args.moco_dim, args.moco_k, args.moco_m, args.moco_t, args.moco_alpha, args.mlp)
     print(model)
 
     if args.distributed:
@@ -231,7 +235,7 @@ def main_worker(gpu, ngpus_per_node, args):
                 transforms.ColorJitter(0.4, 0.4, 0.4, 0.1)  # not strengthened
             ], p=0.8),
             transforms.RandomGrayscale(p=0.2),
-            transforms.RandomApply([moco.loader.GaussianBlur([.1, 2.])], p=0.5),
+            transforms.RandomApply([mixco.loader.GaussianBlur([.1, 2.])], p=0.5),
             transforms.RandomHorizontalFlip(),
             transforms.ToTensor(),
             normalize
@@ -247,7 +251,7 @@ def main_worker(gpu, ngpus_per_node, args):
             normalize
         ]
 
-    train_dataset = TinyImageNet(args.data, transform=moco.loader.TwoCropsTransform(transforms.Compose(augmentation)))
+    train_dataset = TinyImageNet(args.data, transform=mixco.loader.TwoCropsTransform(transforms.Compose(augmentation)))
     #train_dataset = datasets.ImageFolder(
     #    traindir,
     #    moco.loader.TwoCropsTransform(transforms.Compose(augmentation)))
@@ -303,12 +307,9 @@ def train(train_loader, model, criterion, optimizer, epoch, args):
             images[1] = images[1].cuda(args.gpu, non_blocking=True)
 
         # compute output
-        output, target = model(im_a=images[0], im_b=images[1])
-        
-        lsm = nn.functional.log_softmax(output, dim=1)
-        loss = -(target * lsm).sum(dim=1).mean()
-        target = target.max(dim=1)[1]
-        #loss = criterion(output, target)
+        output, target, mix_rep, mix_target = model(im_q=images[0], im_k=images[1])
+        loss = criterion(output, target)
+        loss += args.mix_hyper*F.mse_loss(mix_rep, mix_target)
 
         # acc1/acc5 are (K+1)-way contrast classifier accuracy
         # measure accuracy and record loss
