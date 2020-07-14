@@ -146,7 +146,7 @@ class MixCo(nn.Module):
             im_mix, lam = self.data_mixer(im_q, im_k, alpha=self.alpha)
             mix_target = lam*q + (1-lam)*k
             
-        mix_rep = self.encoder_k(im_mix)
+        mix_rep = self.encoder_q(im_mix)
         mix_rep = nn.functional.normalize(mix_rep, dim=1)
             
         # compute logits
