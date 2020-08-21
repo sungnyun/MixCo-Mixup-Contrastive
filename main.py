@@ -11,7 +11,7 @@ import torch.utils.data.distributed
 import torchvision.transforms as transforms
 import torchvision.datasets as datasets
 
-import os, math, random, time, shutil, builtins, argparse, warnings
+import os, math, random, time, shutil, builtins, argparse, warnings, json
 
 import architectures as archs
 from builders import *
@@ -258,7 +258,7 @@ def main_worker(gpu, ngpus_per_node, args):
         adjust_learning_rate(optimizer, epoch, args)
 
         # train for one epoch
-        train(train_loader, model, optimizer, epoch+1, args)
+        acc1, acc5 = train(train_loader, model, optimizer, epoch+1, args)
 
     # always saves at the end of training    
     else:
@@ -268,6 +268,9 @@ def main_worker(gpu, ngpus_per_node, args):
             'state_dict': model.state_dict(),
             'optimizer' : optimizer.state_dict(),
         }, is_best=False, filename='{}.pth.tar'.format(args.exp_name))
+        
+        update_json(args.exp_name, 'pretrain' [acc1.item(), acc5.item()])
+
 
 
 def train(train_loader, model, optimizer, epoch, args):
@@ -315,6 +318,8 @@ def train(train_loader, model, optimizer, epoch, args):
 
         if i % args.print_freq == 0:
             progress.display(i)
+            
+        return top1.avg, top5.avg
 
 
 def save_checkpoint(state, is_best, filename='test'):

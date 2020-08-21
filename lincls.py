@@ -10,7 +10,7 @@ import torch.utils.data.distributed
 import torchvision.transforms as transforms
 import torchvision.datasets as datasets
 
-import os, random, shutil, time, warnings, builtins, argparse
+import os, random, shutil, time, warnings, builtins, argparse, json
 
 from Datasets import *
 from utils import *
@@ -81,6 +81,9 @@ parser.add_argument('--multiprocessing-distributed', action='store_true',
 
 parser.add_argument('--pretrained', default='', type=str,
                     help='path to moco pretrained checkpoint')
+# other configs:
+parser.add_argument('--exp-name', default='test', type=str,
+                    help='experiment_name')
 
 num_classes = {'tiny-imagenet': 200, 'imagenet':1000}
 
@@ -294,7 +297,7 @@ def main_worker(gpu, ngpus_per_node, args):
         train(train_loader, model, criterion, optimizer, epoch, args)
 
         # evaluate on validation set
-        acc1 = validate(val_loader, model, criterion, args)
+        acc1, acc5 = validate(val_loader, model, criterion, args)
 
         # remember best acc@1 and save checkpoint
         is_best = acc1 > best_acc1
@@ -311,6 +314,9 @@ def main_worker(gpu, ngpus_per_node, args):
             }, is_best)
             if epoch == args.start_epoch:
                 sanity_check(model.state_dict(), args.pretrained)
+                
+    else:
+        update_json(args.exp_name, 'lincls', [best_acc1.item(), acc5.item()])
 
 
 def train(train_loader, model, criterion, optimizer, epoch, args):
@@ -405,7 +411,7 @@ def validate(val_loader, model, criterion, args):
         print(' * Acc@1 {top1.avg:.3f} Acc@5 {top5.avg:.3f}'
               .format(top1=top1, top5=top5))
 
-    return top1.avg
+    return top1.avg, top5.avg
 
 
 def save_checkpoint(state, is_best, filename='test'):

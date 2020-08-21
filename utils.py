@@ -1,7 +1,7 @@
-import torch, math
+import torch, math, json
 import torch.nn.functional as F
 
-__all__ = ['AverageMeter', 'ProgressMeter', 'adjust_learning_rate', 'accuracy']
+__all__ = ['AverageMeter', 'ProgressMeter', 'adjust_learning_rate', 'accuracy', 'update_json']
 
 
 class AverageMeter(object):
@@ -71,4 +71,20 @@ def accuracy(output, target, topk=(1,)):
             correct_k = correct[:k].view(-1).float().sum(0, keepdim=True)
             res.append(correct_k.mul_(100.0 / batch_size))
         return res
+    
+def update_json(exp_name, part='pretrain', acc=[0,0], path='./results/results.json'):
+    acc = [round(acc[0], 3), round(acc[1], 3)]
+    
+    with open(path, 'r') as f:
+        result_dict = json.load(f)
+    
+        if exp_name not in result_dict.keys():
+            result_dict[exp_name] = dict()
+
+        result_dict[exp_name][part] = acc
+    
+    with open(path, 'w') as f:
+        json.dump(result_dict, f)
+        
+    print('results updated to %s' % path)
     
