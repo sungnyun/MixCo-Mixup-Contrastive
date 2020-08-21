@@ -1,9 +1,10 @@
 ILSVRC*
 wandb/
 data/
-kd_weights/
 results/
 .ipynb_checkpoints/
 __pycache__/
 tiny-imagenet-200/
 checkpoint/
+.tar
+.pth
