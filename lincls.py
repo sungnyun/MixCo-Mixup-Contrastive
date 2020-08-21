@@ -9,7 +9,6 @@ import torch.utils.data
 import torch.utils.data.distributed
 import torchvision.transforms as transforms
 import torchvision.datasets as datasets
-import torchvision.models as models
 
 import os, random, shutil, time, warnings, builtins, argparse
 
@@ -35,6 +34,7 @@ parser.add_argument('-a', '--arch', metavar='ARCH', default='resnet18',
                     help='model architecture: ' +
                         ' | '.join(model_names) +
                         ' (default: resnet18)')
+parser.add_argument('-cos', action='store_true')
 parser.add_argument('-j', '--workers', default=32, type=int, metavar='N',
                     help='number of data loading workers (default: 32)')
 parser.add_argument('--epochs', default=100, type=int, metavar='N',
@@ -145,7 +145,8 @@ def main_worker(gpu, ngpus_per_node, args):
                                 world_size=args.world_size, rank=args.rank)
     # create model
     print("=> creating model '{}'".format(args.arch))
-    model = archs.__dict__[args.arch](num_classes=num_classes[args.dataset])
+    model = archs.__dict__[args.arch](num_classes=num_classes[args.dataset],
+                                     small_input=True if (args.dataset == 'tiny-imagenet') else False)
 
     # freeze all layers but the last fc
     for name, param in model.named_parameters():
@@ -161,19 +162,20 @@ def main_worker(gpu, ngpus_per_node, args):
         if os.path.isfile(args.pretrained):
             print("=> loading checkpoint '{}'".format(args.pretrained))
             checkpoint = torch.load(args.pretrained, map_location="cpu")
-
+            #print(checkpoint['state_dict'].keys())
             # rename pre-trained keys
             state_dict = checkpoint['state_dict']
             for k in list(state_dict.keys()):
                 # retain only encoder_q up to before the embedding layer
-                if k.startswith('module.encoder_q') and not k.startswith('module.encoder_q.fc'):
+                if k.startswith('encoder_q') and not k.startswith('encoder_q.fc'):
                     # remove prefix
-                    state_dict[k[len("module.encoder_q."):]] = state_dict[k]
+                    state_dict[k[len("encoder_q."):]] = state_dict[k]
                 # delete renamed or unused k
                 del state_dict[k]
 
             args.start_epoch = 0
             msg = model.load_state_dict(state_dict, strict=False)
+            #print(state_dict.keys())
             assert set(msg.missing_keys) == {"fc.weight", "fc.bias"}
 
             print("=> loaded pre-trained model '{}'".format(args.pretrained))
@@ -244,15 +246,15 @@ def main_worker(gpu, ngpus_per_node, args):
     cudnn.benchmark = True
 
     # Data loading code
-    traindir = os.path.join(args.data, 'train')
-    valdir = os.path.join(args.data, 'val')
+    traindir = os.path.join(args.data_path, 'train')
+    valdir = os.path.join(args.data_path, 'val')
     normalize = transforms.Normalize(mean=[0.485, 0.456, 0.406],
                                      std=[0.229, 0.224, 0.225])
 
     if args.dataset == 'imagenet':
         raise NotImplementedError("Imagenet Lincls is supported. (yet...)")
         
-    elif args.dataet == 'tiny-imagenet':
+    elif args.dataset == 'tiny-imagenet':
         train_dataset = TinyImageNet(
             args.data_path,
             transform = transforms.Compose([
@@ -272,7 +274,7 @@ def main_worker(gpu, ngpus_per_node, args):
         num_workers=args.workers, pin_memory=True, sampler=train_sampler)
     
     val_loader = torch.utils.data.DataLoader(
-        TinyImageNet(args.data, train=False, transform=transforms.Compose([
+        TinyImageNet(args.data_path, train=False, transform=transforms.Compose([
             transforms.ToTensor(),
             normalize,
         ])),

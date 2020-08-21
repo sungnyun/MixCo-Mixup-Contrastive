@@ -250,22 +250,24 @@ def main_worker(gpu, ngpus_per_node, args):
         train_dataset, batch_size=args.batch_size, shuffle=(train_sampler is None),
         num_workers=args.workers, pin_memory=True, sampler=train_sampler, drop_last=True)
 
+    print(args.epochs)
+    print('=====================')
     for epoch in range(args.start_epoch, args.epochs):
         if args.distributed:
             train_sampler.set_epoch(epoch)
         adjust_learning_rate(optimizer, epoch, args)
 
         # train for one epoch
-        train(train_loader, model, optimizer, epoch, args)
+        train(train_loader, model, optimizer, epoch+1, args)
 
     # always saves at the end of training    
     else:
         save_checkpoint({
-            'epoch': epoch + 1,
+            'epoch': epoch+1,
             'arch': args.arch,
             'state_dict': model.state_dict(),
             'optimizer' : optimizer.state_dict(),
-        }, is_best=False, filename='{}_{:04d}.pth.tar'.format(args.exp_name, epoch))
+        }, is_best=False, filename='{}.pth.tar'.format(args.exp_name))
 
 
 def train(train_loader, model, optimizer, epoch, args):

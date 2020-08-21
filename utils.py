@@ -55,8 +55,7 @@ def adjust_learning_rate(optimizer, epoch, args):
             lr *= 0.1 if epoch >= milestone else 1.
     for param_group in optimizer.param_groups:
         param_group['lr'] = lr
-
-
+        
 def accuracy(output, target, topk=(1,)):
     """Computes the accuracy over the k top predictions for the specified values of k"""
     with torch.no_grad():
