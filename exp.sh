@@ -13,4 +13,4 @@ exp_name="test"
 python ./main.py -a resnet18 --builder mixco --lr 0.015 --epochs 150 --gpu $gpu --dataset tiny-imagenet --data-path $data_path --mlp --moco-t 0.2 --aug-plus --cos --exp-name $exp_name
 
 # linear classification protocol
-python ./lincls.py -a resnet18 --lr 3.0 --epochs 150 --dataset tiny-imagenet --data-path $data_path --pretrained ./results/pretrained/${exp_name}.pth.tar --gpu $gpu --exp-name $exp_name
+python ./lincls.py -a resnet18 --lr 3.0 --epochs 100 --dataset tiny-imagenet --data-path $data_path --pretrained ./results/pretrained/${exp_name}.pth.tar --gpu $gpu --exp-name $exp_name
