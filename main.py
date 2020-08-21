@@ -1,16 +1,6 @@
-#!/usr/bin/env python
-# Copyright (c) Facebook, Inc. and its affiliates. All Rights Reserved
-import argparse
-import builtins
-import math
-import os
-import random
-import shutil
-import time
-import warnings
-
 import torch
 import torch.nn as nn
+import torch.nn.functional as F
 import torch.nn.parallel
 import torch.backends.cudnn as cudnn
 import torch.distributed as dist
@@ -20,28 +10,29 @@ import torch.utils.data
 import torch.utils.data.distributed
 import torchvision.transforms as transforms
 import torchvision.datasets as datasets
-import torchvision.models as models
+import architectures as archs
 
-import moco.loader
-import moco.builder
+import os, math, random, time, shutil, builtins, argparse, warnings
 
-import mixco.builder
-import mixco.loader
+from builders import *
+from utils import *
 
-from Datasets import *
-
-model_names = sorted(name for name in models.__dict__
+model_names = sorted(name for name in archs.__dict__
     if name.islower() and not name.startswith("__")
-    and callable(models.__dict__[name]))
+    and callable(archs.__dict__[name]))
 
 parser = argparse.ArgumentParser(description='PyTorch ImageNet Training')
-parser.add_argument('data', metavar='DIR',
+parser.add_argument('--builder', default='moco', 
+                    help='pretrain builder')
+parser.add_argument('--data-path', metavar='DIR', default='./data/tiny-imagenet',
                     help='path to dataset')
-parser.add_argument('-a', '--arch', metavar='ARCH', default='resnet50',
+parser.add_argument('--dataset', metavar='DATA', default='tiny-imagenet',
+                    help='name of dataset')
+parser.add_argument('-a', '--arch', metavar='ARCH', default='resnet18',
                     choices=model_names,
                     help='model architecture: ' +
                         ' | '.join(model_names) +
-                        ' (default: resnet50)')
+                        ' (default: resnet18)')
 parser.add_argument('-j', '--workers', default=32, type=int, metavar='N',
                     help='number of data loading workers (default: 32)')
 parser.add_argument('--epochs', default=200, type=int, metavar='N',
@@ -66,9 +57,9 @@ parser.add_argument('-p', '--print-freq', default=10, type=int,
                     metavar='N', help='print frequency (default: 10)')
 parser.add_argument('--resume', default='', type=str, metavar='PATH',
                     help='path to latest checkpoint (default: none)')
-parser.add_argument('--world-size', default=-1, type=int,
+parser.add_argument('--world-size', default=1, type=int,
                     help='number of nodes for distributed training')
-parser.add_argument('--rank', default=-1, type=int,
+parser.add_argument('--rank', default=0, type=int,
                     help='node rank for distributed training')
 parser.add_argument('--dist-url', default='tcp://224.66.41.62:23456', type=str,
                     help='url used to set up distributed training')
@@ -84,21 +75,31 @@ parser.add_argument('--multiprocessing-distributed', action='store_true',
                          'fastest way to use PyTorch for either single node or '
                          'multi node data parallel training')
 
-# mixco specific configs:
-parser.add_argument('--mixco-dim', default=128, type=int,
+# moco specific configs:
+parser.add_argument('--moco-dim', default=128, type=int,
                     help='feature dimension (default: 128)')
-parser.add_argument('--mixco-t', default=0.07, type=float,
+parser.add_argument('--moco-k', default=65536, type=int,
+                    help='queue size; number of negative keys (default: 65536)')
+parser.add_argument('--moco-m', default=0.999, type=float,
+                    help='moco momentum of updating key encoder (default: 0.999)')
+parser.add_argument('--moco-t', default=0.07, type=float,
                     help='softmax temperature (default: 0.07)')
-parser.add_argument('--mixco-alpha', default=1.0, type=float,
-                    help='beta dist alpha (default: 1.0)')
-parser.add_argument('--mixco-eps', default=0.0, type=float,
-                    help='LS epsilon (default: 0.0)')
 parser.add_argument('--mlp', action='store_true',
                     help='use mlp head')
 parser.add_argument('--aug-plus', action='store_true',
                     help='use moco v2 data augmentation')
 parser.add_argument('--cos', action='store_true',
                     help='use cosine lr schedule')
+
+# mixco specific configs:
+parser.add_argument('--mix-alpha', default=1, type=float,
+                    help='mixup beta distribution alpha')
+
+# other configs:
+parser.add_argument('--exp-name', default='test', type=str,
+                    help='experiment_name')
+
+image_size = {'tiny-imagenet': 64, 'imagenet': 224}
 
 
 def main():
@@ -137,7 +138,9 @@ def main():
 
 
 def main_worker(gpu, ngpus_per_node, args):
+    args.single = True if (type(args.gpu) == int) else False
     args.gpu = gpu
+    args.small_input = False if (args.dataset == 'imagenet') else True
 
     # suppress printing if not master
     if args.multiprocessing_distributed and args.gpu != 0:
@@ -146,6 +149,7 @@ def main_worker(gpu, ngpus_per_node, args):
         builtins.print = print_pass
 
     if args.gpu is not None:
+        print(args.gpu)
         print("Use GPU: {} for training".format(args.gpu))
 
     if args.distributed:
@@ -159,9 +163,16 @@ def main_worker(gpu, ngpus_per_node, args):
                                 world_size=args.world_size, rank=args.rank)
     # create model
     print("=> creating model '{}'".format(args.arch))
-    model = mixco.builder.MixCo(
-        models.__dict__[args.arch],
-        args.mixco_dim, args.mixco_t, args.mixco_alpha, args.mixco_eps, args.mlp)
+    
+    if args.builder == 'moco':
+        model = MoCo(
+            archs.__dict__[args.arch],
+            args.moco_dim, args.moco_k, args.moco_m, args.moco_t, args.mlp, args.single, args.small_input)
+        
+    elif args.builder == 'mixco':
+        model = MixCo(
+            archs.__dict__[args.arch],
+            args.moco_dim, args.moco_k, args.moco_m, args.moco_t, args.mlp, args.mix_alpha, args.single, args.small_input)   
     print(model)
 
     if args.distributed:
@@ -186,52 +197,31 @@ def main_worker(gpu, ngpus_per_node, args):
         torch.cuda.set_device(args.gpu)
         model = model.cuda(args.gpu)
         # comment out the following line for debugging
-        raise NotImplementedError("Only DistributedDataParallel is supported.")
-    else:
+        #raise NotImplementedError("Only DistributedDataParallel is supported.")
+    #else:
         # AllGather implementation (batch shuffle, queue update, etc.) in
         # this code only supports DistributedDataParallel.
-        raise NotImplementedError("Only DistributedDataParallel is supported.")
+        #raise NotImplementedError("Only DistributedDataParallel is supported.")
 
     # define loss function (criterion) and optimizer
-    criterion = nn.CrossEntropyLoss().cuda(args.gpu)
-
     optimizer = torch.optim.SGD(model.parameters(), args.lr,
                                 momentum=args.momentum,
                                 weight_decay=args.weight_decay)
 
-    # optionally resume from a checkpoint
-    if args.resume:
-        if os.path.isfile(args.resume):
-            print("=> loading checkpoint '{}'".format(args.resume))
-            if args.gpu is None:
-                checkpoint = torch.load(args.resume)
-            else:
-                # Map model to be loaded to specified single gpu.
-                loc = 'cuda:{}'.format(args.gpu)
-                checkpoint = torch.load(args.resume, map_location=loc)
-            args.start_epoch = checkpoint['epoch']
-            model.load_state_dict(checkpoint['state_dict'])
-            optimizer.load_state_dict(checkpoint['optimizer'])
-            print("=> loaded checkpoint '{}' (epoch {})"
-                  .format(args.resume, checkpoint['epoch']))
-        else:
-            print("=> no checkpoint found at '{}'".format(args.resume))
-
     cudnn.benchmark = True
 
     # Data loading code
-    #traindir = os.path.join(args.data, 'train')
+    traindir = os.path.join(args.data_path, 'train')
     normalize = transforms.Normalize(mean=[0.485, 0.456, 0.406],
                                      std=[0.229, 0.224, 0.225])
     if args.aug_plus:
         # MoCo v2's aug: similar to SimCLR https://arxiv.org/abs/2002.05709
         augmentation = [
-            transforms.RandomResizedCrop(224, scale=(0.2, 1.)),
             transforms.RandomApply([
                 transforms.ColorJitter(0.4, 0.4, 0.4, 0.1)  # not strengthened
             ], p=0.8),
             transforms.RandomGrayscale(p=0.2),
-            transforms.RandomApply([moco.loader.GaussianBlur([.1, 2.])], p=0.5),
+            transforms.RandomApply([custom_transforms.GaussianBlur([.1, 2.])], p=0.5),
             transforms.RandomHorizontalFlip(),
             transforms.ToTensor(),
             normalize
@@ -239,23 +229,23 @@ def main_worker(gpu, ngpus_per_node, args):
     else:
         # MoCo v1's aug: the same as InstDisc https://arxiv.org/abs/1805.01978
         augmentation = [
-            transforms.RandomResizedCrop(224, scale=(0.2, 1.)),
             transforms.RandomGrayscale(p=0.2),
             transforms.ColorJitter(0.4, 0.4, 0.4, 0.4),
             transforms.RandomHorizontalFlip(),
             transforms.ToTensor(),
             normalize
         ]
-
-    train_dataset = TinyImageNet(args.data, transform=moco.loader.TwoCropsTransform(transforms.Compose(augmentation)))
-    #train_dataset = datasets.ImageFolder(
-    #    traindir,
-    #    moco.loader.TwoCropsTransform(transforms.Compose(augmentation)))
-
-    if args.distributed:
-        train_sampler = torch.utils.data.distributed.DistributedSampler(train_dataset)
+        
+    if args.dataset == 'tiny-imagenet':
+        augmentation.insert(0, transforms.RandomCrop(64, padding=8))
     else:
-        train_sampler = None
+        augmentation.insert(0, transforms.RandomResizedCrop(224, scale=(0.2, 1.)))
+
+    train_dataset = datasets.ImageFolder(
+        traindir,
+        custom_transforms.TwoCropsTransform(transforms.Compose(augmentation)))
+
+    train_sampler = torch.utils.data.distributed.DistributedSampler(train_dataset) if args.distributed else None
 
     train_loader = torch.utils.data.DataLoader(
         train_dataset, batch_size=args.batch_size, shuffle=(train_sampler is None),
@@ -267,19 +257,19 @@ def main_worker(gpu, ngpus_per_node, args):
         adjust_learning_rate(optimizer, epoch, args)
 
         # train for one epoch
-        train(train_loader, model, criterion, optimizer, epoch, args)
+        train(train_loader, model, optimizer, epoch, args)
 
-        if not args.multiprocessing_distributed or (args.multiprocessing_distributed
-                and args.rank % ngpus_per_node == 0):
-            save_checkpoint({
-                'epoch': epoch + 1,
-                'arch': args.arch,
-                'state_dict': model.state_dict(),
-                'optimizer' : optimizer.state_dict(),
-            }, is_best=False, filename='checkpoint_{:04d}.pth.tar'.format(epoch))
+    # always saves at the end of training    
+    else:
+        save_checkpoint({
+            'epoch': epoch + 1,
+            'arch': args.arch,
+            'state_dict': model.state_dict(),
+            'optimizer' : optimizer.state_dict(),
+        }, is_best=False, filename='{}_{:04d}.pth.tar'.format(args.exp_name, epoch))
 
 
-def train(train_loader, model, criterion, optimizer, epoch, args):
+def train(train_loader, model, optimizer, epoch, args):
     batch_time = AverageMeter('Time', ':6.3f')
     data_time = AverageMeter('Data', ':6.3f')
     losses = AverageMeter('Loss', ':.4e')
@@ -303,16 +293,12 @@ def train(train_loader, model, criterion, optimizer, epoch, args):
             images[1] = images[1].cuda(args.gpu, non_blocking=True)
 
         # compute output
-        output, target = model(im_a=images[0], im_b=images[1])
-        
-        lsm = nn.functional.log_softmax(output, dim=1)
-        loss = -(target * lsm).sum(dim=1).mean()
-        target = target.max(dim=1)[1]
-        #loss = criterion(output, target)
+        outputs = model(im_q=images[0], im_k=images[1])
+        loss = model.criterion(outputs)
 
         # acc1/acc5 are (K+1)-way contrast classifier accuracy
         # measure accuracy and record loss
-        acc1, acc5 = accuracy(output, target, topk=(1, 5))
+        acc1, acc5 = accuracy(outputs[0], outputs[1], topk=(1, 5))
         losses.update(loss.item(), images[0].size(0))
         top1.update(acc1[0], images[0].size(0))
         top5.update(acc5[0], images[0].size(0))
@@ -330,80 +316,9 @@ def train(train_loader, model, criterion, optimizer, epoch, args):
             progress.display(i)
 
 
-def save_checkpoint(state, is_best, filename='checkpoint.pth.tar'):
+def save_checkpoint(state, is_best, filename='test'):
+    filename = os.path.join('./results/pretrained', filename)
     torch.save(state, filename)
-    if is_best:
-        shutil.copyfile(filename, 'model_best.pth.tar')
-
-
-class AverageMeter(object):
-    """Computes and stores the average and current value"""
-    def __init__(self, name, fmt=':f'):
-        self.name = name
-        self.fmt = fmt
-        self.reset()
-
-    def reset(self):
-        self.val = 0
-        self.avg = 0
-        self.sum = 0
-        self.count = 0
-
-    def update(self, val, n=1):
-        self.val = val
-        self.sum += val * n
-        self.count += n
-        self.avg = self.sum / self.count
-
-    def __str__(self):
-        fmtstr = '{name} {val' + self.fmt + '} ({avg' + self.fmt + '})'
-        return fmtstr.format(**self.__dict__)
-
-
-class ProgressMeter(object):
-    def __init__(self, num_batches, meters, prefix=""):
-        self.batch_fmtstr = self._get_batch_fmtstr(num_batches)
-        self.meters = meters
-        self.prefix = prefix
-
-    def display(self, batch):
-        entries = [self.prefix + self.batch_fmtstr.format(batch)]
-        entries += [str(meter) for meter in self.meters]
-        print('\t'.join(entries))
-
-    def _get_batch_fmtstr(self, num_batches):
-        num_digits = len(str(num_batches // 1))
-        fmt = '{:' + str(num_digits) + 'd}'
-        return '[' + fmt + '/' + fmt.format(num_batches) + ']'
-
-
-def adjust_learning_rate(optimizer, epoch, args):
-    """Decay the learning rate based on schedule"""
-    lr = args.lr
-    if args.cos:  # cosine lr schedule
-        lr *= 0.5 * (1. + math.cos(math.pi * epoch / args.epochs))
-    else:  # stepwise lr schedule
-        for milestone in args.schedule:
-            lr *= 0.1 if epoch >= milestone else 1.
-    for param_group in optimizer.param_groups:
-        param_group['lr'] = lr
-
-
-def accuracy(output, target, topk=(1,)):
-    """Computes the accuracy over the k top predictions for the specified values of k"""
-    with torch.no_grad():
-        maxk = max(topk)
-        batch_size = target.size(0)
-
-        _, pred = output.topk(maxk, 1, True, True)
-        pred = pred.t()
-        correct = pred.eq(target.view(1, -1).expand_as(pred))
-
-        res = []
-        for k in topk:
-            correct_k = correct[:k].view(-1).float().sum(0, keepdim=True)
-            res.append(correct_k.mul_(100.0 / batch_size))
-        return res
 
 
 if __name__ == '__main__':

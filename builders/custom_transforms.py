@@ -2,6 +2,7 @@
 from PIL import ImageFilter
 import random
 
+__all__ = ['TwoCropsTransform', 'GaussianBlur']
 
 class TwoCropsTransform:
     """Take two random crops of one image as the query and key."""

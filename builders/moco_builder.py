@@ -1,6 +1,11 @@
 # Copyright (c) Facebook, Inc. and its affiliates. All Rights Reserved
 import torch
 import torch.nn as nn
+import torch.nn.functional as F
+
+from utils import *
+
+__all__ = ['MoCo']
 
 
 class MoCo(nn.Module):
@@ -8,7 +13,7 @@ class MoCo(nn.Module):
     Build a MoCo model with: a query encoder, a key encoder, and a queue
     https://arxiv.org/abs/1911.05722
     """
-    def __init__(self, base_encoder, dim=128, K=65536, m=0.999, T=0.07, mlp=False):
+    def __init__(self, base_encoder, dim=128, K=65536, m=0.999, T=0.07, mlp=False, single_gpu=False, small_input=False):
         """
         dim: feature dimension (default: 128)
         K: queue size; number of negative keys (default: 65536)
@@ -16,6 +21,8 @@ class MoCo(nn.Module):
         T: softmax temperature (default: 0.07)
         """
         super(MoCo, self).__init__()
+        
+        self.single_gpu = single_gpu
 
         self.K = K
         self.m = m
@@ -23,8 +30,8 @@ class MoCo(nn.Module):
 
         # create the encoders
         # num_classes is the output fc dimension
-        self.encoder_q = base_encoder(num_classes=dim)
-        self.encoder_k = base_encoder(num_classes=dim)
+        self.encoder_q = base_encoder(num_classes=dim, small_input=small_input)
+        self.encoder_k = base_encoder(num_classes=dim, small_input=small_input)
 
         if mlp:  # hack: brute-force replacement
             dim_mlp = self.encoder_q.fc.weight.shape[1]
@@ -52,7 +59,8 @@ class MoCo(nn.Module):
     @torch.no_grad()
     def _dequeue_and_enqueue(self, keys):
         # gather keys before updating queue
-        keys = concat_all_gather(keys)
+        if not self.single_gpu:
+            keys = concat_all_gather(keys)
 
         batch_size = keys.shape[0]
 
@@ -130,13 +138,15 @@ class MoCo(nn.Module):
             self._momentum_update_key_encoder()  # update the key encoder
 
             # shuffle for making use of BN
-            im_k, idx_unshuffle = self._batch_shuffle_ddp(im_k)
+            if not self.single_gpu:
+                im_k, idx_unshuffle = self._batch_shuffle_ddp(im_k)
 
             k = self.encoder_k(im_k)  # keys: NxC
             k = nn.functional.normalize(k, dim=1)
 
             # undo shuffle
-            k = self._batch_unshuffle_ddp(k, idx_unshuffle)
+            if not self.single_gpu:
+                k = self._batch_unshuffle_ddp(k, idx_unshuffle)
             
 
         # compute logits
@@ -159,18 +169,8 @@ class MoCo(nn.Module):
         self._dequeue_and_enqueue(k)
 
         return logits, labels
-
-
-# utils
-@torch.no_grad()
-def concat_all_gather(tensor):
-    """
-    Performs all_gather operation on the provided tensors.
-    *** Warning ***: torch.distributed.all_gather has no gradient.
-    """
-    tensors_gather = [torch.ones_like(tensor)
-        for _ in range(torch.distributed.get_world_size())]
-    torch.distributed.all_gather(tensors_gather, tensor, async_op=False)
-
-    output = torch.cat(tensors_gather, dim=0)
-    return output
+    
+    def criterion(self, outputs):
+        logits, labels = outputs
+        return F.cross_entropy(logits, labels)
+        
