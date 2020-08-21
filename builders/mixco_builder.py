@@ -196,7 +196,6 @@ class MixCo(nn.Module):
             rep_elem = rep_k.unsqueeze(-2).expand(b, mix_size, dim)
             rep_mix = lam * rep_elem + (1-lam) * neg_queue[idx]
 
-
         logits = torch.einsum('nc,nkc->nk', [rep_q, rep_mix])
         labels = lam.squeeze()
 

@@ -10,10 +10,10 @@ import torch.utils.data
 import torch.utils.data.distributed
 import torchvision.transforms as transforms
 import torchvision.datasets as datasets
-import architectures as archs
 
 import os, math, random, time, shutil, builtins, argparse, warnings
 
+import architectures as archs
 from builders import *
 from utils import *
 
@@ -44,7 +44,7 @@ parser.add_argument('-b', '--batch-size', default=256, type=int,
                     help='mini-batch size (default: 256), this is the total '
                          'batch size of all GPUs on the current node when '
                          'using Data Parallel or Distributed Data Parallel')
-parser.add_argument('--lr', '--learning-rate', default=0.03, type=float,
+parser.add_argument('--lr', '--learning-rate', default=0.015, type=float,
                     metavar='LR', help='initial learning rate', dest='lr')
 parser.add_argument('--schedule', default=[120, 160], nargs='*', type=int,
                     help='learning rate schedule (when to drop lr by 10x)')
@@ -92,14 +92,12 @@ parser.add_argument('--cos', action='store_true',
                     help='use cosine lr schedule')
 
 # mixco specific configs:
-parser.add_argument('--mix-alpha', default=1, type=float,
+parser.add_argument('--mix-alpha', default=1.0, type=float,
                     help='mixup beta distribution alpha')
 
 # other configs:
 parser.add_argument('--exp-name', default='test', type=str,
                     help='experiment_name')
-
-image_size = {'tiny-imagenet': 64, 'imagenet': 224}
 
 
 def main():
@@ -135,6 +133,7 @@ def main():
     else:
         # Simply call main_worker function
         main_worker(args.gpu, ngpus_per_node, args)
+
 
 
 def main_worker(gpu, ngpus_per_node, args):

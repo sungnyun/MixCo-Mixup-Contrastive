@@ -1,13 +1,3 @@
-#!/usr/bin/env python
-# Copyright (c) Facebook, Inc. and its affiliates. All Rights Reserved
-import argparse
-import builtins
-import os
-import random
-import shutil
-import time
-import warnings
-
 import torch
 import torch.nn as nn
 import torch.nn.parallel
@@ -21,21 +11,30 @@ import torchvision.transforms as transforms
 import torchvision.datasets as datasets
 import torchvision.models as models
 
+import os, random, shutil, time, warnings, builtins, argparse
+
 from Datasets import *
 from utils import *
 
-model_names = sorted(name for name in models.__dict__
+import architectures as archs
+from builders import *
+from utils import *
+
+model_names = sorted(name for name in archs.__dict__
     if name.islower() and not name.startswith("__")
-    and callable(models.__dict__[name]))
+    and callable(archs.__dict__[name]))
 
 parser = argparse.ArgumentParser(description='PyTorch ImageNet Training')
-parser.add_argument('data', metavar='DIR',
+
+parser.add_argument('--data-path', metavar='DIR', default='./data/tiny-imagenet',
                     help='path to dataset')
-parser.add_argument('-a', '--arch', metavar='ARCH', default='resnet50',
+parser.add_argument('--dataset', metavar='DATA', default='tiny-imagenet',
+                    help='name of dataset')
+parser.add_argument('-a', '--arch', metavar='ARCH', default='resnet18',
                     choices=model_names,
                     help='model architecture: ' +
                         ' | '.join(model_names) +
-                        ' (default: resnet50)')
+                        ' (default: resnet18)')
 parser.add_argument('-j', '--workers', default=32, type=int, metavar='N',
                     help='number of data loading workers (default: 32)')
 parser.add_argument('--epochs', default=100, type=int, metavar='N',
@@ -47,7 +46,7 @@ parser.add_argument('-b', '--batch-size', default=256, type=int,
                     help='mini-batch size (default: 256), this is the total '
                          'batch size of all GPUs on the current node when '
                          'using Data Parallel or Distributed Data Parallel')
-parser.add_argument('--lr', '--learning-rate', default=30., type=float,
+parser.add_argument('--lr', '--learning-rate', default=3., type=float,
                     metavar='LR', help='initial learning rate', dest='lr')
 parser.add_argument('--schedule', default=[60, 80], nargs='*', type=int,
                     help='learning rate schedule (when to drop lr by a ratio)')
@@ -83,8 +82,9 @@ parser.add_argument('--multiprocessing-distributed', action='store_true',
 parser.add_argument('--pretrained', default='', type=str,
                     help='path to moco pretrained checkpoint')
 
-best_acc1 = 0
+num_classes = {'tiny-imagenet': 200, 'imagenet':1000}
 
+best_acc1 = 0
 
 def main():
     args = parser.parse_args()
@@ -145,13 +145,13 @@ def main_worker(gpu, ngpus_per_node, args):
                                 world_size=args.world_size, rank=args.rank)
     # create model
     print("=> creating model '{}'".format(args.arch))
-    model = models.__dict__[args.arch]()
-    model.fc = nn.Linear(512, 200) # for tiny-imagenet only
+    model = archs.__dict__[args.arch](num_classes=num_classes[args.dataset])
 
     # freeze all layers but the last fc
     for name, param in model.named_parameters():
         if name not in ['fc.weight', 'fc.bias']:
             param.requires_grad = False
+            
     # init the fc layer
     model.fc.weight.data.normal_(mean=0.0, std=0.01)
     model.fc.bias.data.zero_()
@@ -162,7 +162,7 @@ def main_worker(gpu, ngpus_per_node, args):
             print("=> loading checkpoint '{}'".format(args.pretrained))
             checkpoint = torch.load(args.pretrained, map_location="cpu")
 
-            # rename moco pre-trained keys
+            # rename pre-trained keys
             state_dict = checkpoint['state_dict']
             for k in list(state_dict.keys()):
                 # retain only encoder_q up to before the embedding layer
@@ -249,16 +249,18 @@ def main_worker(gpu, ngpus_per_node, args):
     normalize = transforms.Normalize(mean=[0.485, 0.456, 0.406],
                                      std=[0.229, 0.224, 0.225])
 
-    #train_dataset = datasets.ImageFolder(
-    #    traindir,
-    train_dataset = TinyImageNet(
-        args.data,
-        transform = transforms.Compose([
-            transforms.RandomResizedCrop(224),
-            transforms.RandomHorizontalFlip(),
-            transforms.ToTensor(),
-            normalize,
-        ]))
+    if args.dataset == 'imagenet':
+        raise NotImplementedError("Imagenet Lincls is supported. (yet...)")
+        
+    elif args.dataet == 'tiny-imagenet':
+        train_dataset = TinyImageNet(
+            args.data_path,
+            transform = transforms.Compose([
+                transforms.RandomCrop(64, padding=8),
+                transforms.RandomHorizontalFlip(),
+                transforms.ToTensor(),
+                normalize,
+            ]))
 
     if args.distributed:
         train_sampler = torch.utils.data.distributed.DistributedSampler(train_dataset)
@@ -268,11 +270,9 @@ def main_worker(gpu, ngpus_per_node, args):
     train_loader = torch.utils.data.DataLoader(
         train_dataset, batch_size=args.batch_size, shuffle=(train_sampler is None),
         num_workers=args.workers, pin_memory=True, sampler=train_sampler)
-
+    
     val_loader = torch.utils.data.DataLoader(
         TinyImageNet(args.data, train=False, transform=transforms.Compose([
-            transforms.Resize(256),
-            transforms.CenterCrop(224),
             transforms.ToTensor(),
             normalize,
         ])),
