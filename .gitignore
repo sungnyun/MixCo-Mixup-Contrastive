@@ -1,7 +1,6 @@
 ILSVRC*
 wandb/
 data/
-results/
 .ipynb_checkpoints/
 __pycache__/
 tiny-imagenet-200/

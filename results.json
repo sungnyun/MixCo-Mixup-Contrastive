@@ -1,0 +1,6 @@
+{
+    "example_exp":{
+        "pretrained": [0, 0],
+        "lincls": [0, 0]
+    }
+}
