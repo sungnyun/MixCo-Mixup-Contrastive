@@ -409,7 +409,7 @@ def validate(val_loader, model, criterion, args):
 
 
 def save_checkpoint(state, is_best, filename='test'):
-    filename = os.path.join('./lincls', filename)
+    filename = os.path.join('./results/lincls', filename)
     torch.save(state, filename)
     if is_best:
         shutil.copyfile(filename, 'model_best.pth.tar')
@@ -430,8 +430,7 @@ def sanity_check(state_dict, pretrained_weights):
             continue
 
         # name in pretrained model
-        k_pre = 'module.encoder_q.' + k[len('module.'):] \
-            if k.startswith('module.') else 'module.encoder_q.' + k
+        k_pre = 'encoder_q.' + k
 
         assert ((state_dict[k].cpu() == state_dict_pre[k_pre]).all()), \
             '{} is changed in linear classifier training.'.format(k)
