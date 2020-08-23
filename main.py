@@ -139,7 +139,8 @@ def main():
 def main_worker(gpu, ngpus_per_node, args):
     args.single = True if (type(args.gpu) == int) else False
     args.gpu = gpu
-    args.small_input = False if (args.dataset == 'imagenet') else True
+    #args.small_input = False if (args.dataset == 'imagenet') else True
+    args.small_input = False
 
     # suppress printing if not master
     if args.multiprocessing_distributed and args.gpu != 0:
@@ -235,10 +236,10 @@ def main_worker(gpu, ngpus_per_node, args):
             normalize
         ]
         
-    if args.dataset == 'tiny-imagenet':
-        augmentation.insert(0, transforms.RandomCrop(64, padding=8))
-    else:
-        augmentation.insert(0, transforms.RandomResizedCrop(224, scale=(0.2, 1.)))
+    #if args.dataset == 'tiny-imagenet':
+    #    augmentation.insert(0, transforms.RandomCrop(64, padding=8))
+    #else:
+    augmentation.insert(0, transforms.RandomResizedCrop(224, scale=(0.2, 1.)))
 
     train_dataset = datasets.ImageFolder(
         traindir,
@@ -249,9 +250,7 @@ def main_worker(gpu, ngpus_per_node, args):
     train_loader = torch.utils.data.DataLoader(
         train_dataset, batch_size=args.batch_size, shuffle=(train_sampler is None),
         num_workers=args.workers, pin_memory=True, sampler=train_sampler, drop_last=True)
-
-    print(args.epochs)
-    print('=====================')
+    
     for epoch in range(args.start_epoch, args.epochs):
         if args.distributed:
             train_sampler.set_epoch(epoch)
@@ -319,7 +318,7 @@ def train(train_loader, model, optimizer, epoch, args):
         if i % args.print_freq == 0:
             progress.display(i)
             
-        return top1.avg, top5.avg
+    return top1.avg, top5.avg
 
 
 def save_checkpoint(state, is_best, filename='test'):

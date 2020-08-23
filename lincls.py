@@ -148,8 +148,8 @@ def main_worker(gpu, ngpus_per_node, args):
                                 world_size=args.world_size, rank=args.rank)
     # create model
     print("=> creating model '{}'".format(args.arch))
-    model = archs.__dict__[args.arch](num_classes=num_classes[args.dataset],
-                                     small_input=True if (args.dataset == 'tiny-imagenet') else False)
+    model = archs.__dict__[args.arch](num_classes=num_classes[args.dataset], small_input=False)
+                                     #small_input=True if (args.dataset == 'tiny-imagenet') else False)
 
     # freeze all layers but the last fc
     for name, param in model.named_parameters():
@@ -261,7 +261,8 @@ def main_worker(gpu, ngpus_per_node, args):
         train_dataset = TinyImageNet(
             args.data_path,
             transform = transforms.Compose([
-                transforms.RandomCrop(64, padding=8),
+                #transforms.RandomCrop(64, padding=8),
+                transforms.RandomResizedCrop(224),
                 transforms.RandomHorizontalFlip(),
                 transforms.ToTensor(),
                 normalize,
@@ -278,6 +279,8 @@ def main_worker(gpu, ngpus_per_node, args):
     
     val_loader = torch.utils.data.DataLoader(
         TinyImageNet(args.data_path, train=False, transform=transforms.Compose([
+            transforms.Resize(256),
+            transforms.CenterCrop(224),
             transforms.ToTensor(),
             normalize,
         ])),

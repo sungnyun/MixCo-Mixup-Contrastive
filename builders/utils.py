@@ -97,7 +97,6 @@ def cross_entropy(inputs, target, weight=None, ignore_index=-100, reduction='mea
     return loss
 
 
-
 def tensor_concater(tensor1, tensor2):
     if tensor1 is None:
         result = tensor2

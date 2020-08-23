@@ -5,8 +5,9 @@ import torch.nn.functional as F
 
 from utils import *
 
-__all__ = ['MoCo']
+from functools import partial
 
+__all__ = ['MoCo']
 
 class MoCo(nn.Module):
     """
@@ -23,15 +24,17 @@ class MoCo(nn.Module):
         super(MoCo, self).__init__()
         
         self.single_gpu = single_gpu
-
         self.K = K
         self.m = m
         self.T = T
 
         # create the encoders
         # num_classes is the output fc dimension
-        self.encoder_q = base_encoder(num_classes=dim, small_input=small_input)
-        self.encoder_k = base_encoder(num_classes=dim, small_input=small_input)
+        norm_layer = partial(SplitBatchNorm, num_splits=4) if single_gpu else nn.BatchNorm2d
+        
+        #if small_input:
+        self.encoder_q = base_encoder(num_classes=dim, small_input=small_input, norm_layer=norm_layer)
+        self.encoder_k = base_encoder(num_classes=dim, small_input=small_input, norm_layer=norm_layer)
 
         if mlp:  # hack: brute-force replacement
             dim_mlp = self.encoder_q.fc.weight.shape[1]
@@ -174,3 +177,29 @@ class MoCo(nn.Module):
         logits, labels = outputs
         return F.cross_entropy(logits, labels)
         
+
+import torch
+import torch.nn as nn
+
+
+class SplitBatchNorm(nn.BatchNorm2d):
+    def __init__(self, num_features, num_splits, **kw):
+        super().__init__(num_features, **kw)
+        self.num_splits = num_splits
+        
+    def forward(self, input):
+        N, C, H, W = input.shape
+        if self.training or not self.track_running_stats:
+            running_mean_split = self.running_mean.repeat(self.num_splits)
+            running_var_split = self.running_var.repeat(self.num_splits)
+            outcome = nn.functional.batch_norm(
+                input.view(-1, C * self.num_splits, H, W), running_mean_split, running_var_split, 
+                self.weight.repeat(self.num_splits), self.bias.repeat(self.num_splits),
+                True, self.momentum, self.eps).view(N, C, H, W)
+            self.running_mean.data.copy_(running_mean_split.view(self.num_splits, C).mean(dim=0))
+            self.running_var.data.copy_(running_var_split.view(self.num_splits, C).mean(dim=0))
+            return outcome
+        else:
+            return nn.functional.batch_norm(
+                input, self.running_mean, self.running_var, 
+                self.weight, self.bias, False, self.momentum, self.eps)
