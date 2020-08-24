@@ -1,4 +1,5 @@
 import torch
+import torch.nn as nn
 import torch.nn.functional as F
 
 __all__ = ['concat_all_gather', 'onehot', 'tensor_concater', 'cross_entropy']
@@ -104,3 +105,16 @@ def tensor_concater(tensor1, tensor2):
         result = torch.cat((tensor1, tensor2))
         
     return result
+
+
+class SoftCrossEntropy(nn.Module):
+    def __init__(self):
+        super(SoftCrossEntropy, self).__init__()
+        
+    def forward(self, logits, target):
+        mix_size = (target[0] != 0).sum().item()
+        logits_n = torch.sum(torch.exp(logits) * target, 1) / mix_size
+        logits_d = torch.sum(torch.exp(target), 1)
+        nll_loss = (-torch.log(logits_n / logits_d)).mean()
+
+        return nll_loss
