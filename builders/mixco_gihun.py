@@ -178,7 +178,7 @@ class MixCo(nn.Module):
         # dequeue and enqueue
         self._dequeue_and_enqueue(k)
 
-        return logits1, logit2, labels
+        return logits1, logits2, labels
     
     def criterion(self, outputs):
         logits1, logits2, labels = outputs
@@ -186,14 +186,14 @@ class MixCo(nn.Module):
     
     @torch.no_grad()
     def data_mixer(self, data, alpha=1.0):
-        b = data.shape
+        b = data.size(0)
 
         idx1 = torch.Tensor(range(b)).long().cuda()
         idx2 = idx1 - 1
 
-        data1 = 0.5*data1[idx1] + 0.5*data1[idx2]
+        data = 0.5*data[idx1] + 0.5*data[idx2]
 
-        return data, idx1, idx2        
+        return data, idx1, idx2
 
 
 class SplitBatchNorm(nn.BatchNorm2d):
