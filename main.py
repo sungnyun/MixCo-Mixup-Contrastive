@@ -301,10 +301,10 @@ def train(train_loader, model, optimizer, epoch, args):
 
         # acc1/acc5 are (K+1)-way contrast classifier accuracy
         # measure accuracy and record loss
-        #if args.builder == 'mixco':
-        #    acc1, acc5 = accuracy(outputs[0], outputs[2].argmax(dim=1), topk=(1, 5))
-        #else:
-        acc1, acc5 = accuracy(outputs[0], outputs[2], topk=(1, 5))
+        if args.builder == 'mixco':
+            acc1, acc5 = accuracy(outputs[0], outputs[1].argmax(dim=1), topk=(1, 5))
+        else:
+            acc1, acc5 = accuracy(outputs[0], outputs[1], topk=(1, 5))
         losses.update(loss.item(), images[0].size(0))
         top1.update(acc1[0], images[0].size(0))
         top5.update(acc5[0], images[0].size(0))
