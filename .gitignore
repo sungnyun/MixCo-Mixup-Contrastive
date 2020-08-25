@@ -5,7 +5,6 @@ data/
 __pycache__/
 tiny-imagenet-200/
 checkpoint/
-.tar
-.pth
-.sh
-
+*.tar
+*.pth
+results/

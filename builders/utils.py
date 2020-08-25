@@ -113,14 +113,14 @@ class SoftCrossEntropy(nn.Module):
         
     def forward(self, logits, target):
         ### log_probability => intersection
-        #mix_size = (target[0] != 0).sum(). item()
-        #probs = F.softmax(logits, 1) * target
-        #probs_nonzero = probs[:, :mix_size]
-        #nll_loss = (- torch.sum(torch.log(probs_nonzero), 1) / mix_size).mean()
+        mix_size = (target[0] != 0).sum(). item()
+        probs = F.softmax(logits, 1) * target
+        probs_nonzero = probs[:, :mix_size]
+        nll_loss = (- torch.sum(torch.log(probs_nonzero), 1) / mix_size).mean()
 
-        mix_size = (target[0] != 0).sum().item()
-        logits_n = torch.sum(torch.exp(logits) * target, 1) / mix_size
-        logits_d = torch.sum(torch.exp(logits), 1)
-        nll_loss = (-torch.log(logits_n / logits_d)).mean()
+        #mix_size = (target[0] != 0).sum().item()
+        #logits_n = torch.sum(torch.exp(logits) * target, 1) / mix_size
+        #logits_d = torch.sum(torch.exp(logits), 1)
+        #nll_loss = (-torch.log(logits_n / logits_d)).mean()
 
         return nll_loss
