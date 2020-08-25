@@ -268,7 +268,7 @@ def main_worker(gpu, ngpus_per_node, args):
             'optimizer' : optimizer.state_dict(),
         }, is_best=False, filename='{}.pth.tar'.format(args.exp_name))
         
-        update_json(args.exp_name, 'pretrain' [acc1.item(), acc5.item()])
+        update_json(args.exp_name, 'pretrain', [acc1.item(), acc5.item()])
 
 
 
