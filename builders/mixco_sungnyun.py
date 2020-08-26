@@ -167,9 +167,12 @@ class MixCo(nn.Module):
         
         # mixed logits & labels
         mix_logits, mix_labels = self.rep_mixer(q, k, self.queue.T.clone().detach())
-
+        
         logits_all = torch.cat((mix_logits, logits), 1)
         labels_all = torch.cat((mix_labels, F.one_hot(labels, logits.size(1)).float()), 1)
+        # only mixed rep.
+        # logits_all = torch.cat((mix_logits, logits[:,1:]), 1)
+        # labels_all = torch.cat((mix_labels, F.one_hot(labels, logits.size(1)).float()[:,1:]), 1)
 
         # apply temperature
         logits_all /= self.T
