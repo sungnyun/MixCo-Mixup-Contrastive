@@ -92,6 +92,7 @@ parser.add_argument('--cos', action='store_true',
                     help='use cosine lr schedule')
 
 # mixco specific configs:
+parser.add_argument('--mix-param', default=0.1, type=float)
 parser.add_argument('--mix-alpha', default=1.0, type=float,
                     help='mixup beta distribution alpha')
 
@@ -172,7 +173,7 @@ def main_worker(gpu, ngpus_per_node, args):
     elif args.builder == 'mixco':
         model = MixCo(
             archs.__dict__[args.arch],
-            args.moco_dim, args.moco_k, args.moco_m, args.moco_t, args.mlp, args.mix_alpha, args.single, args.small_input)   
+            args.moco_dim, args.moco_k, args.moco_m, args.moco_t, args.mix_param, args.mlp, args.single, args.small_input)   
     print(model)
 
     if args.distributed:
@@ -301,10 +302,7 @@ def train(train_loader, model, optimizer, epoch, args):
 
         # acc1/acc5 are (K+1)-way contrast classifier accuracy
         # measure accuracy and record loss
-        if args.builder == 'mixco':
-            acc1, acc5 = accuracy(outputs[0], outputs[1].argmax(dim=1), topk=(1, 5))
-        else:
-            acc1, acc5 = accuracy(outputs[0], outputs[1], topk=(1, 5))
+        acc1, acc5 = accuracy(outputs[0], outputs[1], topk=(1, 5))
         losses.update(loss.item(), images[0].size(0))
         top1.update(acc1[0], images[0].size(0))
         top5.update(acc5[0], images[0].size(0))

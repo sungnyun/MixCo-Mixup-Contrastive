@@ -14,7 +14,7 @@ class MixCo(nn.Module):
     Build a MoCo model with: a query encoder, a key encoder, and a queue
     https://arxiv.org/abs/1911.05722
     """
-    def __init__(self, base_encoder, dim=128, K=65536, m=0.999, T=0.07, alpha=1.0, mlp=False, single_gpu=False, small_input=False):
+    def __init__(self, base_encoder, dim=128, K=65536, m=0.999, T=0.07, mix_param=0.1, mlp=False, single_gpu=False, small_input=False):
         """
         dim: feature dimension (default: 128)
         K: queue size; number of negative keys (default: 65536)
@@ -28,7 +28,7 @@ class MixCo(nn.Module):
         self.K = K
         self.m = m
         self.T = T
-        self.alpha = alpha
+        self.mix_param = mix_param
         
         # create the encoders
         # num_classes is the output fc dimension
@@ -50,6 +50,7 @@ class MixCo(nn.Module):
 
         self.register_buffer("queue_ptr", torch.zeros(1, dtype=torch.long))
         
+        self.loss_fn = nn.CrossEntropyLoss()
         self.soft_loss = SoftCrossEntropy()
 
     @torch.no_grad()
@@ -167,28 +168,28 @@ class MixCo(nn.Module):
         
         # mixed logits & labels
         mix_logits, mix_labels = self.rep_mixer(q, k, self.queue.T.clone().detach())
-        
-        logits_all = torch.cat((mix_logits, logits), 1)
-        labels_all = torch.cat((mix_labels, F.one_hot(labels, logits.size(1)).float()), 1)
-        # only mixed rep.
-        # logits_all = torch.cat((mix_logits, logits[:,1:]), 1)
-        # labels_all = torch.cat((mix_labels, F.one_hot(labels, logits.size(1)).float()[:,1:]), 1)
+        mix_logits = torch.cat((mix_logits, l_neg), 1)
+        mix_labels = torch.cat((F.normalize(mix_labels, p=1, dim=1), torch.zeros_like(l_neg)), 1)
+        # logits_all = torch.cat((mix_logits, logits), 1)
+        # labels_all = torch.cat((mix_labels, F.one_hot(labels, logits.size(1)).float()), 1)
 
         # apply temperature
-        logits_all /= self.T
+        logits /= self.T
+        # mix_logits /= self.T
 
         # dequeue and enqueue
         self._dequeue_and_enqueue(k)
 
-        return logits_all, labels_all
+        return logits, labels, mix_logits, mix_labels
     
     def criterion(self, outputs):
-        logits, labels = outputs
-        loss = self.soft_loss(logits, labels)
+        logits, labels, mix_logits, mix_labels = outputs
+        loss = self.loss_fn(logits, labels)
+        loss += self.mix_param * self.soft_loss(mix_logits, mix_labels)
         
         return loss
 
-    def rep_mixer(self, rep_q, rep_k, neg_queue, mix_size=10, alpha=1.0):
+    def rep_mixer(self, rep_q, rep_k, neg_queue, mix_size=10):
         with torch.no_grad():
             device = rep_k.device
             b, dim = rep_k.size(0), rep_k.size(1)

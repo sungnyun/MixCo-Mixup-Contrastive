@@ -116,6 +116,6 @@ class SoftCrossEntropy(nn.Module):
         probs = F.softmax(logits, 1) 
         probs_nonzero = probs[:, :mix_size]
         target_nonzero = target[:, :mix_size]
-        nll_loss = (- torch.log(probs_nonzero)*target_nonzero).mean()
+        nll_loss = (- torch.log(probs_nonzero)*target_nonzero).sum(1).mean()
 
         return nll_loss
