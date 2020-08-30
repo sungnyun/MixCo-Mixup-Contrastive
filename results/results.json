@@ -1,1 +1,0 @@
-{"exp_name": {"pretrain": [0, 0], "lincls": [0, 0]}, "test": {"lincls": [1.46, 4.41]}, "moco_nosplit": {"lincls": [20.37, 40.79]}, "moco_split": {"lincls": [20.74, 40.47]}, "moco_split_nosmall_100": {"lincls": [39.1, 63.88]}}

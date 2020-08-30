@@ -4,7 +4,7 @@ import torch.nn as nn
 import torch.nn.functional as F
 import numpy as np
 
-from .utils import *
+from builders.utils import SoftCrossEntropy
 
 __all__ = ['MixCo']
 
@@ -14,7 +14,7 @@ class MixCo(nn.Module):
     Build a MoCo model with: a query encoder, a key encoder, and a queue
     https://arxiv.org/abs/1911.05722
     """
-    def __init__(self, base_encoder, dim=128, K=65536, m=0.999, T=0.07, alpha=1.0, mlp=False, single_gpu=False, small_input=False):
+    def __init__(self, base_encoder, dim=128, K=65536, m=0.999, T=0.07, mix_param=0.1, mlp=False, single_gpu=False, small_input=False):
         """
         dim: feature dimension (default: 128)
         K: queue size; number of negative keys (default: 65536)
@@ -28,7 +28,7 @@ class MixCo(nn.Module):
         self.K = K
         self.m = m
         self.T = T
-        self.alpha = alpha
+        self.mix_param = mix_param
         
         # create the encoders
         # num_classes is the output fc dimension
@@ -49,6 +49,9 @@ class MixCo(nn.Module):
         self.queue = nn.functional.normalize(self.queue, dim=0)
 
         self.register_buffer("queue_ptr", torch.zeros(1, dtype=torch.long))
+        
+        self.loss_fn = nn.CrossEntropyLoss()
+        self.soft_loss = SoftCrossEntropy()
 
     @torch.no_grad()
     def _momentum_update_key_encoder(self):
@@ -134,7 +137,6 @@ class MixCo(nn.Module):
         # compute query features
         q = self.encoder_q(im_q)  # queries: NxC
         q = nn.functional.normalize(q, dim=1)
-        
 
         # compute key features
         with torch.no_grad():  # no gradient to keys
@@ -166,10 +168,14 @@ class MixCo(nn.Module):
         
         # mixed logits & labels
         mix_logits, mix_labels = self.rep_mixer(q, k, self.queue.T.clone().detach())
+        mix_logits = torch.cat((mix_logits, l_neg), 1)
+        mix_labels = torch.cat((F.normalize(mix_labels, p=1, dim=1), torch.zeros_like(l_neg)), 1)
+        # logits_all = torch.cat((mix_logits, logits), 1)
+        # labels_all = torch.cat((mix_labels, F.one_hot(labels, logits.size(1)).float()), 1)
 
         # apply temperature
         logits /= self.T
-        mix_logits /= self.T
+        # mix_logits /= self.T
 
         # dequeue and enqueue
         self._dequeue_and_enqueue(k)
@@ -178,22 +184,22 @@ class MixCo(nn.Module):
     
     def criterion(self, outputs):
         logits, labels, mix_logits, mix_labels = outputs
-        loss = cross_entropy(logits, labels)
-        loss += 0.5 * cross_entropy(mix_logits, mix_labels)
+        loss = self.loss_fn(logits, labels)
+        loss += self.mix_param * self.soft_loss(mix_logits, mix_labels)
         
         return loss
 
-    def rep_mixer(self, rep_q, rep_k, neg_queue, mix_size=100, alpha=1.0):
+    def rep_mixer(self, rep_q, rep_k, neg_queue, mix_size=10):
         with torch.no_grad():
             device = rep_k.device
             b, dim = rep_k.size(0), rep_k.size(1)
 
-            lam = np.random.beta(alpha, alpha, size=(b, mix_size, 1))
-            lam = torch.Tensor(lam).to(device)
-            idx = np.random.randint(0, neg_queue.size(0), (b, 100))
-            idx = torch.LongTensor(idx).to(device)
+            lam = np.random.uniform(0, 1, size=(b, mix_size, 1))
+            lam = torch.from_numpy(lam).float().to(device)
+            idx = np.random.randint(0, neg_queue.size(0), size=(b, mix_size))
+            idx = torch.from_numpy(idx).long().to(device)
 
-            rep_elem = rep_k.unsqueeze(-2).expand(b, mix_size, dim)
+            rep_elem = rep_k.unsqueeze(1).expand(b, mix_size, dim)
             rep_mix = lam * rep_elem + (1-lam) * neg_queue[idx]
 
         logits = torch.einsum('nc,nkc->nk', [rep_q, rep_mix])
