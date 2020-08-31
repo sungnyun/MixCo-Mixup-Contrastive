@@ -4,7 +4,7 @@ import torch.nn as nn
 import torch.nn.functional as F
 import numpy as np
 
-from builders.utils import SoftCrossEntropy
+from builders.utils import * 
 
 __all__ = ['MixCo']
 
@@ -144,17 +144,18 @@ class MixCo(nn.Module):
         with torch.no_grad():  # no gradient to keys
             self._momentum_update_key_encoder()  # update the key encoder
 
+            all_k = torch.cat((im_k, imgs_mix))
             # shuffle for making use of BN
             if not self.single_gpu:
-                im_k, idx_unshuffle = self._batch_shuffle_ddp(im_k)
+                all_k, idx_unshuffle = self._batch_shuffle_ddp(all_k)
 
-            k = self.encoder_k(torch.cat((im_k, imgs_mix)))  # keys: (N+N/2)xC
+            k = self.encoder_k(all_k)  # keys: (N+N/2)xC
             k = nn.functional.normalize(k, dim=1)
 
             # undo shuffle
             if not self.single_gpu:
                 k = self._batch_unshuffle_ddp(k, idx_unshuffle)
-            
+
             k_mix = k[im_k.size(0):]
             k = k[:im_k.size(0)]
 
@@ -184,14 +185,7 @@ class MixCo(nn.Module):
         self._dequeue_and_enqueue(k)
 
         return logits, labels, logits_mix, lbls_mix
-    
-    def criterion(self, outputs):
-        logits, labels, logits_mix, lbls_mix = outputs
-        loss = self.loss_fn(logits, labels)
-        loss += self.mix_param * self.soft_loss(logits_mix, lbls_mix)
-        
-        return loss
-
+   
     def rep_mixer(self, rep_q, rep_k, neg_queue, mix_size=10):
         with torch.no_grad():
             device = rep_k.device
@@ -221,4 +215,3 @@ class MixCo(nn.Module):
         lbls_mix = torch.cat((torch.diag(lam.squeeze()), torch.diag((1-lam).squeeze())), dim=1)
         
         return imgs_mix, lbls_mix
-

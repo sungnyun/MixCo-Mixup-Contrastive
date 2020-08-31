@@ -2,9 +2,6 @@ import torch
 import torch.nn as nn
 import torch.nn.functional as F
 
-__all__ = ['concat_all_gather', 'onehot', 'tensor_concater', 'cross_entropy']
-
-
 # utils
 @torch.no_grad()
 def concat_all_gather(tensor):
@@ -116,3 +113,17 @@ class SoftCrossEntropy(nn.Module):
         nll_loss = (- target * torch.log(probs)).sum(1).mean()
 
         return nll_loss
+
+class MixcoLoss(nn.Module):
+    def __init__(self, mix_param):
+        super(MixcoLoss, self).__init__()
+        self.loss_fn = nn.CrossEntropyLoss()
+        self.soft_loss = SoftCrossEntropy()
+        self.mix_param = mix_param
+
+    def forward(self, outputs):
+        logits, labels, logits_mix, lbls_mix = outputs
+        loss = self.loss_fn(logits, labels)
+        loss += self.mix_param * self.soft_loss(logits_mix, lbls_mix)
+        
+        return loss  

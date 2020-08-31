@@ -208,6 +208,7 @@ def main_worker(gpu, ngpus_per_node, args):
     optimizer = torch.optim.SGD(model.parameters(), args.lr,
                                 momentum=args.momentum,
                                 weight_decay=args.weight_decay)
+    criterion = MixcoLoss(args.mix_param).cuda(args.gpu)
 
     cudnn.benchmark = True
 
@@ -258,7 +259,7 @@ def main_worker(gpu, ngpus_per_node, args):
         adjust_learning_rate(optimizer, epoch, args)
 
         # train for one epoch
-        acc1, acc5 = train(train_loader, model, optimizer, epoch+1, args)
+        acc1, acc5 = train(train_loader, model, optimizer, criterion, epoch+1, args)
 
     # always saves at the end of training    
     else:
@@ -273,7 +274,7 @@ def main_worker(gpu, ngpus_per_node, args):
 
 
 
-def train(train_loader, model, optimizer, epoch, args):
+def train(train_loader, model, optimizer, criterion, epoch, args):
     batch_time = AverageMeter('Time', ':6.3f')
     data_time = AverageMeter('Data', ':6.3f')
     losses = AverageMeter('Loss', ':.4e')
@@ -298,7 +299,7 @@ def train(train_loader, model, optimizer, epoch, args):
 
         # compute output
         outputs = model(im_q=images[0], im_k=images[1])
-        loss = model.criterion(outputs)
+        loss = criterion(outputs)
 
         # acc1/acc5 are (K+1)-way contrast classifier accuracy
         # measure accuracy and record loss
