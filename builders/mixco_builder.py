@@ -138,6 +138,8 @@ class MixCo(nn.Module):
         q = self.encoder_q(im_q)  # queries: NxC
         q = nn.functional.normalize(q, dim=1)
 
+        imgs_mix, lbls_mix = self.img_mixer(im_k)
+
         # compute key features
         with torch.no_grad():  # no gradient to keys
             self._momentum_update_key_encoder()  # update the key encoder
@@ -146,12 +148,15 @@ class MixCo(nn.Module):
             if not self.single_gpu:
                 im_k, idx_unshuffle = self._batch_shuffle_ddp(im_k)
 
-            k = self.encoder_k(im_k)  # keys: NxC
+            k = self.encoder_k(torch.cat((im_k, imgs_mix)))  # keys: (N+N/2)xC
             k = nn.functional.normalize(k, dim=1)
 
             # undo shuffle
             if not self.single_gpu:
                 k = self._batch_unshuffle_ddp(k, idx_unshuffle)
+            
+            k_mix = k[im_k.size(0):]
+            k = k[:im_k.size(0)]
 
         # compute logits
         # Einstein sum is more intuitive
@@ -167,25 +172,23 @@ class MixCo(nn.Module):
         labels = torch.zeros(logits.shape[0], dtype=torch.long).cuda()
         
         # mixed logits & labels
-        mix_logits, mix_labels = self.rep_mixer(q, k, self.queue.T.clone().detach())
-        mix_logits = torch.cat((mix_logits, l_neg), 1)
-        mix_labels = torch.cat((F.normalize(mix_labels, p=1, dim=1), torch.zeros_like(l_neg)), 1)
-        # logits_all = torch.cat((mix_logits, logits), 1)
-        # labels_all = torch.cat((mix_labels, F.one_hot(labels, logits.size(1)).float()), 1)
+        k_mix = k_mix.repeat(2, 1)
+        lbls_mix = lbls_mix.repeat(2, 1)
+        logits_mix = torch.mm(k_mix, q.transpose(0, 1)) 
 
         # apply temperature
         logits /= self.T
-        # mix_logits /= self.T
+        logits_mix /= self.T
 
         # dequeue and enqueue
         self._dequeue_and_enqueue(k)
 
-        return logits, labels, mix_logits, mix_labels
+        return logits, labels, logits_mix, lbls_mix
     
     def criterion(self, outputs):
-        logits, labels, mix_logits, mix_labels = outputs
+        logits, labels, logits_mix, lbls_mix = outputs
         loss = self.loss_fn(logits, labels)
-        loss += self.mix_param * self.soft_loss(mix_logits, mix_labels)
+        loss += self.mix_param * self.soft_loss(logits_mix, lbls_mix)
         
         return loss
 
@@ -207,5 +210,15 @@ class MixCo(nn.Module):
 
         return logits, labels
     
-
+    @torch.no_grad()
+    def img_mixer(self, im_k):
+        B = im_k.size(0)
+        assert B % 2 == 0
+        sid = int(B/2)
+        im_k1, im_k2 = im_k[:sid], im_k[sid:]
+        lam = torch.from_numpy(np.random.uniform(0, 1, size=(sid,1,1,1))).float().to(im_k.device)
+        imgs_mix = lam * im_k1 + (1-lam) * im_k2
+        lbls_mix = torch.cat((torch.diag(lam.squeeze()), torch.diag((1-lam).squeeze())), dim=1)
+        
+        return imgs_mix, lbls_mix
 

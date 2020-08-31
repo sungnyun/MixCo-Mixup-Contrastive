@@ -8,5 +8,4 @@ checkpoint/
 *.tar
 *.pth
 results/
-*.sh
 *.json
