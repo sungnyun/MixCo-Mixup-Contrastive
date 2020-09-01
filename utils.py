@@ -1,3 +1,5 @@
+import os
+
 import torch, math, json
 import torch.nn.functional as F
 
@@ -74,7 +76,10 @@ def accuracy(output, target, topk=(1,)):
     
 def update_json(exp_name, part='pretrain', acc=[0,0], path='./results/results.json'):
     acc = [round(acc[0], 3), round(acc[1], 3)]
-    
+    if not os.path.exists(path):
+        with open(path, 'w') as f:
+            json.dump({}, f)
+
     with open(path, 'r') as f:
         result_dict = json.load(f)
     

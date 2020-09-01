@@ -61,9 +61,9 @@ parser.add_argument('--resume', default='', type=str, metavar='PATH',
                     help='path to latest checkpoint (default: none)')
 parser.add_argument('-e', '--evaluate', dest='evaluate', action='store_true',
                     help='evaluate model on validation set')
-parser.add_argument('--world-size', default=-1, type=int,
+parser.add_argument('--world-size', default=1, type=int,
                     help='number of nodes for distributed training')
-parser.add_argument('--rank', default=-1, type=int,
+parser.add_argument('--rank', default=0, type=int,
                     help='node rank for distributed training')
 parser.add_argument('--dist-url', default='tcp://224.66.41.62:23456', type=str,
                     help='url used to set up distributed training')
@@ -168,17 +168,27 @@ def main_worker(gpu, ngpus_per_node, args):
             #print(checkpoint['state_dict'].keys())
             # rename pre-trained keys
             state_dict = checkpoint['state_dict']
-            for k in list(state_dict.keys()):
-                # retain only encoder_q up to before the embedding layer
-                if k.startswith('encoder_q') and not k.startswith('encoder_q.fc'):
-                    # remove prefix
-                    state_dict[k[len("encoder_q."):]] = state_dict[k]
-                # delete renamed or unused k
-                del state_dict[k]
+            if args.distributed:
+                for k in list(state_dict.keys()):
+                    # retain only encoder_q up to before the embedding layer
+                    if k.startswith('module.encoder_q') and not k.startswith('module.encoder_q.fc'):
+                        # remove prefix
+                        state_dict[k[len("module.encoder_q."):]] = state_dict[k]
+                    # delete renamed or unused k
+                    del state_dict[k]
+            else:
+                for k in list(state_dict.keys()):
+                    # retain only encoder_q up to before the embedding layer
+                    if k.startswith('encoder_q') and not k.startswith('encoder_q.fc'):
+                        # remove prefix
+                        state_dict[k[len("encoder_q."):]] = state_dict[k]
+                    # delete renamed or unused k
+                    del state_dict[k]
 
             args.start_epoch = 0
             msg = model.load_state_dict(state_dict, strict=False)
             #print(state_dict.keys())
+            #print(msg.missing_keys)
             assert set(msg.missing_keys) == {"fc.weight", "fc.bias"}
 
             print("=> loaded pre-trained model '{}'".format(args.pretrained))
@@ -439,7 +449,7 @@ def sanity_check(state_dict, pretrained_weights):
             continue
 
         # name in pretrained model
-        k_pre = 'encoder_q.' + k
+        k_pre = 'module.encoder_q.' + k[len('module.'):] if k.startswith('module.') else 'encoder_q.' + k
 
         assert ((state_dict[k].cpu() == state_dict_pre[k_pre]).all()), \
             '{} is changed in linear classifier training.'.format(k)
