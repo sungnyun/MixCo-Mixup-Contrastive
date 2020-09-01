@@ -134,29 +134,30 @@ class MixCo(nn.Module):
             logits, targets
         """
 
-        imgs_mix, lbls_mix = self.img_mixer(im_q)
-
         # compute query features
-        q = self.encoder_q(torch.cat((im_q, imgs_mix)))  # queries: (N+N/2)xC
+        q = self.encoder_q(im_q)  # queries: NxC
         q = nn.functional.normalize(q, dim=1)
 
-        q_mix = q[im_q.size(0):]
-        q = q[:im_q.size(0)]
+        imgs_mix, lbls_mix = self.img_mixer(im_k)
 
         # compute key features
         with torch.no_grad():  # no gradient to keys
             self._momentum_update_key_encoder()  # update the key encoder
 
+            all_k = torch.cat((im_k, imgs_mix))
             # shuffle for making use of BN
             if not self.single_gpu:
-                im_k, idx_unshuffle = self._batch_shuffle_ddp(im_k)
+                all_k, idx_unshuffle = self._batch_shuffle_ddp(all_k)
 
-            k = self.encoder_k(im_k)  # keys: NxC
+            k = self.encoder_k(all_k)  # keys: (N+N/2)xC
             k = nn.functional.normalize(k, dim=1)
 
             # undo shuffle
             if not self.single_gpu:
                 k = self._batch_unshuffle_ddp(k, idx_unshuffle)
+
+            k_mix = k[im_k.size(0):]
+            k = k[:im_k.size(0)]
 
         # compute logits
         # Einstein sum is more intuitive
@@ -172,7 +173,9 @@ class MixCo(nn.Module):
         labels = torch.zeros(logits.shape[0], dtype=torch.long).cuda()
         
         # mixed logits & labels
-        logits_mix = torch.mm(q_mix, k.transpose(0, 1)) 
+        k_mix = k_mix.repeat(2, 1)
+        lbls_mix = lbls_mix.repeat(2, 1)
+        logits_mix = torch.mm(k_mix, q.transpose(0, 1)) 
 
         # apply temperature
         logits /= self.T
