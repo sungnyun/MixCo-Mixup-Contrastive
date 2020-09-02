@@ -263,14 +263,15 @@ def main_worker(gpu, ngpus_per_node, args):
 
     # always saves at the end of training    
     else:
-        save_checkpoint({
-            'epoch': epoch+1,
-            'arch': args.arch,
-            'state_dict': model.state_dict(),
-            'optimizer' : optimizer.state_dict(),
-        }, is_best=False, filename='{}.pth.tar'.format(args.exp_name))
-        
-        update_json(args.exp_name, 'pretrain', [acc1.item(), acc5.item()])
+        if not args.multiprocessing_distributed or (args.multiprocessing_distributed and args.rank % ngpus_per_node == 0):
+            save_checkpoint({
+                'epoch': epoch+1,
+                'arch': args.arch,
+                'state_dict': model.state_dict(),
+                'optimizer' : optimizer.state_dict(),
+            }, is_best=False, filename='{}.pth.tar'.format(args.exp_name))
+            
+            update_json(args.exp_name, 'pretrain', [acc1.item(), acc5.item()])
 
 
 
