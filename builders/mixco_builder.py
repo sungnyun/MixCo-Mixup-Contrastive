@@ -14,7 +14,7 @@ class MixCo(nn.Module):
     Build a MoCo model with: a query encoder, a key encoder, and a queue
     https://arxiv.org/abs/1911.05722
     """
-    def __init__(self, base_encoder, dim=128, K=65536, m=0.999, T=0.07, mix_param=0.1, mlp=False, single_gpu=False, small_input=False):
+    def __init__(self, base_encoder, dim=128, K=65536, m=0.999, T=0.2, mix_T=0.2, mix_param=0.1, mlp=False, single_gpu=False, small_input=False):
         """
         dim: feature dimension (default: 128)
         K: queue size; number of negative keys (default: 65536)
@@ -28,6 +28,7 @@ class MixCo(nn.Module):
         self.K = K
         self.m = m
         self.T = T
+        self.mix_T = mix_T
         self.mix_param = mix_param
         
         # create the encoders
@@ -171,12 +172,17 @@ class MixCo(nn.Module):
         # labels: positive key indicators
         labels = torch.zeros(logits.shape[0], dtype=torch.long).cuda()
         
-        # mixed logits & labels
-        logits_mix = torch.mm(q_mix, k.transpose(0, 1)) 
+        # mixed logits: N/2 x N
+        logits_mix_pos = torch.mm(q_mix, k.transpose(0, 1)) 
+        # mixed negative logits: N/2 x K
+        logits_mix_neg = torch.mm(q_mix, self.queue.clone().detach())
+        logits_mix = torch.cat([logits_mix_pos, logits_mix_neg], dim=1) # N/2 x (N+K)
+
+        lbls_mix = torch.cat([lbls_mix, torch.zeros_like(logits_mix_neg)], dim=1)
 
         # apply temperature
         logits /= self.T
-        logits_mix /= self.T
+        logits_mix /= self.mix_T
 
         # dequeue and enqueue
         self._dequeue_and_enqueue(k)

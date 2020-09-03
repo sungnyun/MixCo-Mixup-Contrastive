@@ -93,6 +93,8 @@ parser.add_argument('--cos', action='store_true',
 
 # mixco specific configs:
 parser.add_argument('--mix-param', default=0.5, type=float)
+parser.add_argument('--mixco-t', default=0.2, type=float,
+                    help='softmax temperature (default: 0.2)')
 parser.add_argument('--mix-alpha', default=1.0, type=float,
                     help='mixup beta distribution alpha')
 
@@ -173,7 +175,7 @@ def main_worker(gpu, ngpus_per_node, args):
     elif args.builder == 'mixco':
         model = MixCo(
             archs.__dict__[args.arch],
-            args.moco_dim, args.moco_k, args.moco_m, args.moco_t, args.mix_param, args.mlp, args.single, args.small_input)   
+            args.moco_dim, args.moco_k, args.moco_m, args.moco_t, args.mixco_t, args.mix_param, args.mlp, args.single, args.small_input)   
     print(model)
 
     if args.distributed:
