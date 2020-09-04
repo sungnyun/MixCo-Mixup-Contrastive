@@ -93,7 +93,7 @@ parser.add_argument('--cos', action='store_true',
 
 # mixco specific configs:
 parser.add_argument('--mix-param', default=0.5, type=float)
-parser.add_argument('--mixco-t', default=0.2, type=float,
+parser.add_argument('--mixco-t', default=0.05, type=float,
                     help='softmax temperature (default: 0.2)')
 parser.add_argument('--mix-alpha', default=1.0, type=float,
                     help='mixup beta distribution alpha')
