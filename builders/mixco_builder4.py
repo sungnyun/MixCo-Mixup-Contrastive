@@ -173,12 +173,12 @@ class MixCo(nn.Module):
         labels = torch.zeros(logits.shape[0], dtype=torch.long).cuda()
         
         # mixed logits: N/2 x N
-        logits_mix = torch.mm(q_mix, k.transpose(0, 1)) 
+        logits_mix_pos = torch.mm(q_mix, k.transpose(0, 1)) 
         # mixed negative logits: N/2 x K
-        #logits_mix_neg = torch.mm(q_mix, self.queue.clone().detach())
-        #logits_mix = torch.cat([logits_mix_pos, logits_mix_neg], dim=1) # N/2 x (N+K)
+        logits_mix_neg = torch.mm(q_mix, self.queue.clone().detach())
+        logits_mix = torch.cat([logits_mix_pos, logits_mix_neg], dim=1) # N/2 x (N+K)
 
-        #lbls_mix = torch.cat([lbls_mix, torch.zeros_like(logits_mix_neg)], dim=1)
+        lbls_mix = torch.cat([lbls_mix, torch.zeros_like(logits_mix_neg)], dim=1)
 
         # apply temperature
         logits /= self.T
