@@ -92,7 +92,7 @@ parser.add_argument('--cos', action='store_true',
                     help='use cosine lr schedule')
 
 # mixco specific configs:
-parser.add_argument('--mix-param', default=0.5, type=float)
+parser.add_argument('--mix-param', default=1, type=float)
 parser.add_argument('--mixco-t', default=0.05, type=float,
                     help='softmax temperature (default: 0.2)')
 parser.add_argument('--mix-alpha', default=1.0, type=float,
