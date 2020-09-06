@@ -83,7 +83,7 @@ class ResNet(nn.Module):
                       'wide_resnet50_2', 'wide_resnet101_2']
 
     def __init__(self, arch, repeats, num_classes=100, zero_init_residual=False,
-                 groups=1, width_per_group=64, norm_layer=None, small_input=True):
+                 groups=1, width_per_group=64, norm_layer=None, small_input=False):
         super(ResNet, self).__init__()
         if norm_layer is None:
             norm_layer = nn.BatchNorm2d

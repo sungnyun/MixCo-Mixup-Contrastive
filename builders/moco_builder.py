@@ -31,11 +31,10 @@ class MoCo(nn.Module):
 
         # create the encoders
         # num_classes is the output fc dimension
-        norm_layer = partial(SplitBatchNorm, num_splits=4) if single_gpu else nn.BatchNorm2d
         
         #if small_input:
-        self.encoder_q = base_encoder(num_classes=dim, small_input=small_input, norm_layer=norm_layer)
-        self.encoder_k = base_encoder(num_classes=dim, small_input=small_input, norm_layer=norm_layer)
+        self.encoder_q = base_encoder(num_classes=dim, small_input=small_input)
+        self.encoder_k = base_encoder(num_classes=dim, small_input=small_input)
 
         if mlp:  # hack: brute-force replacement
             dim_mlp = self.encoder_q.fc.weight.shape[1]
