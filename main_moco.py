@@ -268,7 +268,7 @@ def main_worker(gpu, ngpus_per_node, args):
         adjust_learning_rate(optimizer, epoch, args)
 
         # train for one epoch
-        train(train_loader, model, criterion, optimizer, epoch, args)
+        acc1, acc5 = train(train_loader, model, criterion, optimizer, epoch, args)
 
     else:
         if not args.multiprocessing_distributed or (args.multiprocessing_distributed
@@ -280,7 +280,7 @@ def main_worker(gpu, ngpus_per_node, args):
                 'optimizer' : optimizer.state_dict(),
             }, is_best=False, filename=args.exp_name+'.pth.tar')
 
-        update_json(args.exp_name, 'pretrain', [acc1.item(), acc5,item()])
+            update_json(args.exp_name, 'pretrain', [acc1.item(), acc5,item()])
 
 
 def train(train_loader, model, criterion, optimizer, epoch, args):
@@ -329,6 +329,7 @@ def train(train_loader, model, criterion, optimizer, epoch, args):
         if i % args.print_freq == 0:
             progress.display(i)
 
+    return top1.avg, top5.avg
 
 def save_checkpoint(state, is_best, filename='checkpoint.pth.tar'):
     filename = os.path.join('results/pretrained', filename)
