@@ -9,4 +9,3 @@ checkpoint/
 *.pth
 results/
 *.json
-*.sh
