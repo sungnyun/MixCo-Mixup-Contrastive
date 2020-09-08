@@ -61,9 +61,9 @@ parser.add_argument('--resume', default='', type=str, metavar='PATH',
                     help='path to latest checkpoint (default: none)')
 parser.add_argument('-e', '--evaluate', dest='evaluate', action='store_true',
                     help='evaluate model on validation set')
-parser.add_argument('--world-size', default=-1, type=int,
+parser.add_argument('--world-size', default=1, type=int,
                     help='number of nodes for distributed training')
-parser.add_argument('--rank', default=-1, type=int,
+parser.add_argument('--rank', default=0, type=int,
                     help='node rank for distributed training')
 parser.add_argument('--dist-url', default='tcp://224.66.41.62:23456', type=str,
                     help='url used to set up distributed training')
@@ -150,7 +150,6 @@ def main_worker(gpu, ngpus_per_node, args):
     print("=> creating model '{}'".format(args.arch))
     model = archs.__dict__[args.arch](num_classes=num_classes[args.dataset], small_input=False)
                                      #small_input=True if (args.dataset == 'tiny-imagenet') else False)
-    model.load_state_dict(torch.load('./results/pretrained/checkpoint.pth.tar'))
 
     # freeze all layers but the last fc
     for name, param in model.named_parameters():
@@ -163,23 +162,33 @@ def main_worker(gpu, ngpus_per_node, args):
 
     # load from pre-trained, before DistributedDataParallel constructor
     if args.pretrained:
-        if os.path.isfile(args.pretrained+'...'):
+        if os.path.isfile(args.pretrained):
             print("=> loading checkpoint '{}'".format(args.pretrained))
             checkpoint = torch.load(args.pretrained, map_location="cpu")
             #print(checkpoint['state_dict'].keys())
             # rename pre-trained keys
             state_dict = checkpoint['state_dict']
-            for k in list(state_dict.keys()):
-                # retain only encoder_q up to before the embedding layer
-                if k.startswith('encoder_q') and not k.startswith('encoder_q.fc'):
-                    # remove prefix
-                    state_dict[k[len("encoder_q."):]] = state_dict[k]
-                # delete renamed or unused k
-                del state_dict[k]
+            if args.distributed:
+                for k in list(state_dict.keys()):
+                    # retain only encoder_q up to before the embedding layer
+                    if k.startswith('module.encoder_q') and not k.startswith('module.encoder_q.fc'):
+                        # remove prefix
+                        state_dict[k[len("module.encoder_q."):]] = state_dict[k]
+                    # delete renamed or unused k
+                    del state_dict[k]
+            else:
+                for k in list(state_dict.keys()):
+                    # retain only encoder_q up to before the embedding layer
+                    if k.startswith('encoder_q') and not k.startswith('encoder_q.fc'):
+                        # remove prefix
+                        state_dict[k[len("encoder_q."):]] = state_dict[k]
+                    # delete renamed or unused k
+                    del state_dict[k]
 
             args.start_epoch = 0
             msg = model.load_state_dict(state_dict, strict=False)
             #print(state_dict.keys())
+            #print(msg.missing_keys)
             assert set(msg.missing_keys) == {"fc.weight", "fc.bias"}
 
             print("=> loaded pre-trained model '{}'".format(args.pretrained))
@@ -307,19 +316,19 @@ def main_worker(gpu, ngpus_per_node, args):
         is_best = acc1 > best_acc1
         best_acc1 = max(acc1, best_acc1)
 
-        if not args.multiprocessing_distributed or (args.multiprocessing_distributed
-                and args.rank % ngpus_per_node == 0):
+    # always saves at the end of training    
+    else:
+        if not args.multiprocessing_distributed or (args.multiprocessing_distributed and args.rank % ngpus_per_node == 0):
             save_checkpoint({
                 'epoch': epoch + 1,
                 'arch': args.arch,
                 'state_dict': model.state_dict(),
                 'best_acc1': best_acc1,
                 'optimizer' : optimizer.state_dict(),
-            }, is_best, filename=args.exp_name)
-            #if epoch == args.start_epoch:
-            #    sanity_check(model.state_dict(), args.pretrained)
+            }, is_best=False, filename='{}.pth.tar'.format(args.exp_name))
+            if epoch == args.start_epoch:
+                sanity_check(model.state_dict(), args.pretrained)
                 
-    else:
         update_json(args.exp_name, 'lincls', [best_acc1.item(), acc5.item()])
 
 
@@ -422,7 +431,7 @@ def save_checkpoint(state, is_best, filename='test'):
     filename = os.path.join('./results/lincls', filename)
     torch.save(state, filename)
     if is_best:
-        shutil.copyfile(filename, 'model_best.pth.tar')
+        shutil.copyfile(filename, './results/lincls/model_best.pth.tar')
 
 
 def sanity_check(state_dict, pretrained_weights):
@@ -440,7 +449,7 @@ def sanity_check(state_dict, pretrained_weights):
             continue
 
         # name in pretrained model
-        k_pre = 'encoder_q.' + k
+        k_pre = 'module.encoder_q.' + k[len('module.'):] if k.startswith('module.') else 'encoder_q.' + k
 
         assert ((state_dict[k].cpu() == state_dict_pre[k_pre]).all()), \
             '{} is changed in linear classifier training.'.format(k)
