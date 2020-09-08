@@ -12,6 +12,7 @@ import torchvision.datasets as datasets
 
 import os, random, shutil, time, warnings, builtins, argparse, json
 
+from torchvision.datasets import CIFAR10, CIFAR100
 from Datasets import *
 from utils import *
 
@@ -85,7 +86,10 @@ parser.add_argument('--pretrained', default='', type=str,
 parser.add_argument('--exp-name', default='test', type=str,
                     help='experiment_name')
 
-num_classes = {'tiny-imagenet': 200, 'imagenet':1000}
+num_classes = {'cifar10': 10, 'cifar100': 100, 'tiny-imagenet': 200, 'imagenet':1000}
+DATASETS = {'cifar10': CIFAR10, 'cifar100': CIFAR100, 'tiny-imagenet': TinyImageNet}
+MEAN = {'cifar10':  [0.4914, 0.4822, 0.4465], 'cifar100': [0.5071, 0.4867, 0.4408], 'tiny-imagenet': [0.485, 0.456, 0.406]}
+STD = {'cifar10': [0.2023, 0.1994, 0.2010], 'cifar100': [0.2675, 0.2565, 0.2761] , 'tiny-imagenet': [0.229, 0.224, 0.225]}
 
 best_acc1 = 0
 
@@ -259,24 +263,19 @@ def main_worker(gpu, ngpus_per_node, args):
     cudnn.benchmark = True
 
     # Data loading code
-    traindir = os.path.join(args.data_path, 'train')
-    valdir = os.path.join(args.data_path, 'val')
-    normalize = transforms.Normalize(mean=[0.485, 0.456, 0.406],
-                                     std=[0.229, 0.224, 0.225])
-
-    if args.dataset == 'imagenet':
-        raise NotImplementedError("Imagenet Lincls is supported. (yet...)")
+    normalize = transforms.Normalize(MEAN[args.dataset], STD[args.dataset])
+    train_transform = transforms.Compose([transforms.RandomResizedCrop(224),
+                                          transforms.RandomHorizontalFlip(),
+                                          transforms.ToTensor(),
+                                          normalize])
         
-    elif args.dataset == 'tiny-imagenet':
-        train_dataset = TinyImageNet(
-            args.data_path,
-            transform = transforms.Compose([
-                #transforms.RandomCrop(64, padding=8),
-                transforms.RandomResizedCrop(224),
-                transforms.RandomHorizontalFlip(),
-                transforms.ToTensor(),
-                normalize,
-            ]))
+    test_transform=transforms.Compose([transforms.Resize(256),
+                                       transforms.CenterCrop(224),
+                                       transforms.ToTensor(),
+                                       normalize])
+    
+    train_dataset = DATASETS[args.dataset](args.data_path, train=True, download=True, transform=train_transform)
+    test_dataset = DATASETS[args.dataset](args.data_path, train=False, download=True, transform=test_transform)
 
     if args.distributed:
         train_sampler = torch.utils.data.distributed.DistributedSampler(train_dataset)
@@ -288,12 +287,7 @@ def main_worker(gpu, ngpus_per_node, args):
         num_workers=args.workers, pin_memory=True, sampler=train_sampler)
     
     val_loader = torch.utils.data.DataLoader(
-        TinyImageNet(args.data_path, train=False, transform=transforms.Compose([
-            transforms.Resize(256),
-            transforms.CenterCrop(224),
-            transforms.ToTensor(),
-            normalize,
-        ])),
+        test_dataset,
         batch_size=args.batch_size, shuffle=False,
         num_workers=args.workers, pin_memory=True)
 
