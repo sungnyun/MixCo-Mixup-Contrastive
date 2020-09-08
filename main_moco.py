@@ -280,7 +280,7 @@ def main_worker(gpu, ngpus_per_node, args):
                 'optimizer' : optimizer.state_dict(),
             }, is_best=False, filename=args.exp_name+'.pth.tar')
 
-            update_json(args.exp_name, 'pretrain', [acc1.item(), acc5,item()])
+            update_json(args.exp_name, 'pretrain', [acc1.item(), acc5.item()])
 
 
 def train(train_loader, model, criterion, optimizer, epoch, args):
