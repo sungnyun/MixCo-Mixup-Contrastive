@@ -14,8 +14,9 @@ import torchvision.datasets as datasets
 import os, math, random, time, shutil, builtins, argparse, warnings, json
 
 import architectures as archs
-from builders.utils import SoftCrossEntropy
-from builders.mixco_builder5 import MixCo
+from builders import custom_transforms
+from builders.utils import *
+from builders import mixco_builder5
 from utils import *
 
 model_names = sorted(name for name in archs.__dict__
@@ -174,7 +175,7 @@ def main_worker(gpu, ngpus_per_node, args):
             args.moco_dim, args.moco_k, args.moco_m, args.moco_t, args.mlp, args.single, args.small_input)
         
     elif args.builder == 'mixco':
-        model = MixCo(
+        model = mixco_builder5.MixCo(
             archs.__dict__[args.arch],
             args.moco_dim, args.moco_k, args.moco_m, args.moco_t, args.mixco_t, args.mix_param, args.mlp, args.single, args.small_input)   
     print(model)
