@@ -14,7 +14,6 @@ import os, random, shutil, time, warnings, builtins, argparse, json
 
 from torchvision.datasets import CIFAR10, CIFAR100
 from Datasets import *
-from utils import *
 
 import architectures as archs
 from builders import *

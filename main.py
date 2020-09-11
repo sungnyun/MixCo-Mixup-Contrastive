@@ -11,6 +11,9 @@ import torch.utils.data.distributed
 import torchvision.transforms as transforms
 import torchvision.datasets as datasets
 
+from torchvision.datasets import CIFAR10, CIFAR100
+from Datasets import *
+
 import os, math, random, time, shutil, builtins, argparse, warnings, json
 
 import architectures as archs
@@ -101,6 +104,10 @@ parser.add_argument('--mix-alpha', default=1.0, type=float,
 # other configs:
 parser.add_argument('--exp-name', default='test', type=str,
                     help='experiment_name')
+
+DATASETS = {'cifar10': CIFAR10, 'cifar100': CIFAR100, 'tiny-imagenet': TinyImageNet}
+MEAN = {'cifar10': [0.4914, 0.4822, 0.4465], 'cifar100': [0.5071, 0.4867, 0.4408], 'tiny-imagenet': [0.485, 0.456, 0.406]}
+STD = {'cifar10': [0.2023, 0.1994, 0.2010], 'cifar100':[0.2675, 0.2565, 0.2761], 'tiny-imagenet': [0.229, 0.224, 0.225]}
 
 
 def main():
@@ -216,8 +223,8 @@ def main_worker(gpu, ngpus_per_node, args):
 
     # Data loading code
     traindir = os.path.join(args.data_path, 'train')
-    normalize = transforms.Normalize(mean=[0.485, 0.456, 0.406],
-                                     std=[0.229, 0.224, 0.225])
+    normalize = transforms.Normalize(MEAN[args.dataset], STD[args.dataset])
+    
     if args.aug_plus:
         # MoCo v2's aug: similar to SimCLR https://arxiv.org/abs/2002.05709
         augmentation = [
@@ -245,10 +252,12 @@ def main_worker(gpu, ngpus_per_node, args):
     #else:
     augmentation.insert(0, transforms.RandomResizedCrop(224, scale=(0.2, 1.)))
 
-    train_dataset = datasets.ImageFolder(
-        traindir,
-        custom_transforms.TwoCropsTransform(transforms.Compose(augmentation)))
-
+    #train_dataset = datasets.ImageFolder(
+    #    traindir,
+    #    custom_transforms.TwoCropsTransform(transforms.Compose(augmentation)))
+    train_transform = custom_transforms.TwoCropsTransform(transforms.Compose(augmentation))
+    train_dataset = DATASETS[args.dataset](args.data_path, train=True, download=False, transform=train_transform)
+    
     train_sampler = torch.utils.data.distributed.DistributedSampler(train_dataset) if args.distributed else None
 
     train_loader = torch.utils.data.DataLoader(

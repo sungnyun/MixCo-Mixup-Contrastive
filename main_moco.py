@@ -22,6 +22,9 @@ import torchvision.transforms as transforms
 import torchvision.datasets as datasets
 import torchvision.models as models
 
+from torchvision.datasets import CIFAR10, CIFAR100
+from Datasets import *
+
 import architectures as archs
 from builders import *
 from utils import *
@@ -101,6 +104,10 @@ parser.add_argument('--aug-plus', action='store_true',
                     help='use moco v2 data augmentation')
 parser.add_argument('--cos', action='store_true',
                     help='use cosine lr schedule')
+
+DATASETS = {'cifar10': CIFAR10, 'cifar100': CIFAR100, 'tiny-imagenet': TinyImageNet}
+MEAN = {'cifar10': [0.4914, 0.4822, 0.4465], 'cifar100': [0.5071, 0.4867, 0.4408], 'tiny-imagenet': [0.485, 0.456, 0.406]}
+STD = {'cifar10': [0.2023, 0.1994, 0.2010], 'cifar100':[0.2675, 0.2565, 0.2761], 'tiny-imagenet': [0.229, 0.224, 0.225]}
 
 
 def main():
@@ -223,8 +230,8 @@ def main_worker(gpu, ngpus_per_node, args):
 
     # Data loading code
     traindir = os.path.join(args.data_path, 'train')
-    normalize = transforms.Normalize(mean=[0.485, 0.456, 0.406],
-                                     std=[0.229, 0.224, 0.225])
+    normalize = transforms.Normalize(MEAN[args.dataset], STD[args.dataset])
+    
     if args.aug_plus:
         # MoCo v2's aug: similar to SimCLR https://arxiv.org/abs/2002.05709
         augmentation = [
@@ -249,9 +256,11 @@ def main_worker(gpu, ngpus_per_node, args):
             normalize
         ]
 
-    train_dataset = datasets.ImageFolder(
-        traindir,
-        custom_transforms.TwoCropsTransform(transforms.Compose(augmentation)))
+    #train_dataset = datasets.ImageFolder(
+    #    traindir,
+    #    custom_transforms.TwoCropsTransform(transforms.Compose(augmentation)))
+    train_transform = custom_transforms.TwoCropsTransform(transforms.Compose(augmentation))
+    train_dataset = DATASETS[args.dataset](args.data_path, train=True, download=False, transform=train_transform)
 
     if args.distributed:
         train_sampler = torch.utils.data.distributed.DistributedSampler(train_dataset)
