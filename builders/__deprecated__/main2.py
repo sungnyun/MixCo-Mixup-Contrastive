@@ -11,13 +11,12 @@ import torch.utils.data.distributed
 import torchvision.transforms as transforms
 import torchvision.datasets as datasets
 
-from torchvision.datasets import CIFAR10, CIFAR100
-from Datasets import *
-
 import os, math, random, time, shutil, builtins, argparse, warnings, json
 
 import architectures as archs
-from builders import *
+from builders import custom_transforms
+from builders.utils import *
+from builders import mixco_builder5
 from utils import *
 
 model_names = sorted(name for name in archs.__dict__
@@ -105,10 +104,6 @@ parser.add_argument('--mix-alpha', default=1.0, type=float,
 parser.add_argument('--exp-name', default='test', type=str,
                     help='experiment_name')
 
-DATASETS = {'cifar10': CIFAR10, 'cifar100': CIFAR100, 'tiny-imagenet': TinyImageNet}
-MEAN = {'cifar10': [0.4914, 0.4822, 0.4465], 'cifar100': [0.5071, 0.4867, 0.4408], 'tiny-imagenet': [0.485, 0.456, 0.406]}
-STD = {'cifar10': [0.2023, 0.1994, 0.2010], 'cifar100':[0.2675, 0.2565, 0.2761], 'tiny-imagenet': [0.229, 0.224, 0.225]}
-
 
 def main():
     args = parser.parse_args()
@@ -180,7 +175,7 @@ def main_worker(gpu, ngpus_per_node, args):
             args.moco_dim, args.moco_k, args.moco_m, args.moco_t, args.mlp, args.single, args.small_input)
         
     elif args.builder == 'mixco':
-        model = MixCo(
+        model = mixco_builder5.MixCo(
             archs.__dict__[args.arch],
             args.moco_dim, args.moco_k, args.moco_m, args.moco_t, args.mixco_t, args.mix_param, args.mlp, args.single, args.small_input)   
     print(model)
@@ -217,14 +212,14 @@ def main_worker(gpu, ngpus_per_node, args):
     optimizer = torch.optim.SGD(model.parameters(), args.lr,
                                 momentum=args.momentum,
                                 weight_decay=args.weight_decay)
-    criterion = MixcoLoss(args.mix_param).cuda(args.gpu)
+    criterion = SoftCrossEntropy().cuda(args.gpu)
 
     cudnn.benchmark = True
 
     # Data loading code
     traindir = os.path.join(args.data_path, 'train')
-    normalize = transforms.Normalize(MEAN[args.dataset], STD[args.dataset])
-    
+    normalize = transforms.Normalize(mean=[0.485, 0.456, 0.406],
+                                     std=[0.229, 0.224, 0.225])
     if args.aug_plus:
         # MoCo v2's aug: similar to SimCLR https://arxiv.org/abs/2002.05709
         augmentation = [
@@ -252,12 +247,10 @@ def main_worker(gpu, ngpus_per_node, args):
     #else:
     augmentation.insert(0, transforms.RandomResizedCrop(224, scale=(0.2, 1.)))
 
-    #train_dataset = datasets.ImageFolder(
-    #    traindir,
-    #    custom_transforms.TwoCropsTransform(transforms.Compose(augmentation)))
-    train_transform = custom_transforms.TwoCropsTransform(transforms.Compose(augmentation))
-    train_dataset = DATASETS[args.dataset](args.data_path, train=True, download=False, transform=train_transform)
-    
+    train_dataset = datasets.ImageFolder(
+        traindir,
+        custom_transforms.TwoCropsTransform(transforms.Compose(augmentation)))
+
     train_sampler = torch.utils.data.distributed.DistributedSampler(train_dataset) if args.distributed else None
 
     train_loader = torch.utils.data.DataLoader(
@@ -311,11 +304,12 @@ def train(train_loader, model, optimizer, criterion, epoch, args):
 
         # compute output
         outputs = model(im_q=images[0], im_k=images[1])
-        loss = criterion(outputs)
+        loss = criterion(*outputs)
 
         # acc1/acc5 are (K+1)-way contrast classifier accuracy
         # measure accuracy and record loss
-        acc1, acc5 = accuracy(outputs[0], outputs[1], topk=(1, 5))
+        target = torch.argmax(outputs[1], dim=1)
+        acc1, acc5 = accuracy(outputs[0], target, topk=(1, 5))
         losses.update(loss.item(), images[0].size(0))
         top1.update(acc1[0], images[0].size(0))
         top5.update(acc5[0], images[0].size(0))
