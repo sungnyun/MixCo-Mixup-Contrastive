@@ -14,6 +14,13 @@ wget http://cs231n.stanford.edu/tiny-imagenet-200.zip
 train_dataset = DATASETS[args.dataset](args.data_path, train=True, download=False, transform=train_transform)
 ``` 
 
+### Structure
+This repository contains python files that can train the model with mixup-based representaion learning.
+`main.py` pretrains the model in unsupervised manner, and saves the encoder part (without classification layers). 
+`main_moco.py` has similar structure as `main.py`. It is for training MoCo-v2, our baseline.
+`lincls.py` loads and freezes the pretrained model, and then train the classifier part on the target dataset.
+`builders/mixco_builder.py` contains a MixCo module. It includes mixing the images, producing the labels, and computing the similarity between positive and negative pairs.
+
 ### Experiments
 
 1. In `./experiments/` directory, there are `.sh` files which include the commands that can reproduce our experimental results. Open and set the configs.
