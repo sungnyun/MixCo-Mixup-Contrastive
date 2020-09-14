@@ -16,13 +16,13 @@ train_dataset = DATASETS[args.dataset](args.data_path, train=True, download=Fals
 
 ### Experiments
 
-1. In `./experiments/` directory, there are commands that can reproduce our experimental results. Open and set the configs.
+1. In `./experiments/` directory, there are `.sh` files which include the commands that can reproduce our experimental results. Open and set the configs.
 ```sh
 data_path="[your_data_path]"
 exp_name="[experiment_name]"
 ```
 2. Run the file. For example, if you want to pretrain the ResNet18 model with Tiny-ImageNet, and then see the linear classification results, run `exp_mix_res18.sh`.
 ```sh
-bash experiments/exp_mix_res18.sh
+CUDA_VISIBLE_DEVICES=[GPUs] bash experiments/exp_mix_res18.sh
 ```
 
