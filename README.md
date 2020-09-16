@@ -17,13 +17,9 @@ train_dataset = DATASETS[args.dataset](args.data_path, train=True, download=Fals
 ### Structure
 This repository contains python files that can train the model with mixup-based representaion learning.
 
-`main.py` pretrains the model in unsupervised manner, and saves the encoder part (without classification layers). 
-
-`main_moco.py` has similar structure as `main.py`. It is for training MoCo-v2, our baseline.
+`pretrain.py` pretrains the model in unsupervised manner, and saves the encoder part (without classification layers). 
 
 `lincls.py` loads and freezes the pretrained model, and then train the classifier part on the target dataset.
-
-`builders/mixco_builder.py` contains a MixCo module. It includes mixing the images, producing the labels, and computing the similarity between positive and negative pairs.
 
 ### Experiments
 
@@ -34,6 +30,6 @@ exp_name="[experiment_name]"
 ```
 2. Run the file. For example, if you want to pretrain the ResNet18 model with Tiny-ImageNet, and then see the linear classification results, run `exp_mix_res18.sh`.
 ```sh
-CUDA_VISIBLE_DEVICES=[GPUs] bash experiments/exp_mix_res18.sh
+bash experiments/exp_mix_res18_tinyimg.sh
 ```
 
