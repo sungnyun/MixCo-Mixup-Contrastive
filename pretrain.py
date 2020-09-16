@@ -130,6 +130,8 @@ def main_worker(gpu, ngpus_per_node, args):
     optimizer = torch.optim.SGD(model.parameters(), args.lr,
                                 momentum=args.momentum,
                                 weight_decay=args.weight_decay)
+    
+    args.mix_param = 0.0 if args.algo == 'moco' else args.mix_param
     criterion = MixcoLoss(args.mix_param).cuda(args.gpu)
 
     cudnn.benchmark = True

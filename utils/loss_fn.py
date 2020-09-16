@@ -23,8 +23,12 @@ class MixcoLoss(nn.Module):
         self.mix_param = mix_param
 
     def forward(self, outputs):
-        logits, labels, logits_mix, lbls_mix = outputs
-        loss = self.loss_fn(logits, labels)
-        loss += self.mix_param * self.soft_loss(logits_mix, lbls_mix)
+        if not self.mix_param:
+            logits, labels = outputs
+            loss = self.loss_fn(logits, labels)
+        else:
+            logits, labels, logits_mix, lbls_mix = outputs
+            loss = self.loss_fn(logits, labels)
+            loss += self.mix_param * self.soft_loss(logits_mix, lbls_mix)
         
         return loss  

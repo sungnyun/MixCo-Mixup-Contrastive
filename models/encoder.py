@@ -187,7 +187,6 @@ class Encoder(nn.Module):
             # undo shuffle
             if not self.single_gpu:
                 k = self._batch_unshuffle_ddp(k, idx_unshuffle)
-            
 
         # compute logits
         # Einstein sum is more intuitive

@@ -28,7 +28,7 @@ This repository contains python files that can train the model with mixup-based 
 data_path="[your_data_path]"
 exp_name="[experiment_name]"
 ```
-2. Run the file. For example, if you want to pretrain the ResNet18 model with Tiny-ImageNet, and then see the linear classification results, run `exp_mix_res18.sh`.
+2. Run the file. For example, if you want to pretrain the ResNet18 model with Tiny-ImageNet, and then see the linear classification results, run `exp_mix_res18_tinyimg.sh`.
 ```sh
 bash experiments/exp_mix_res18_tinyimg.sh
 ```
