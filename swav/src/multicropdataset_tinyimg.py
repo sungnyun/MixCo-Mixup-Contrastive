@@ -17,20 +17,17 @@ import torchvision.transforms as transforms
 logger = getLogger()
 
 
-def MultiCropDataset_tinyimg(self,
-                            data_path,
-                            size_crops,
-                            nmb_crops,
-                            min_scale_crops,
-                            max_scale_crops,
-                            size_dataset=-1,
-                            return_index=False):
+def MultiCropDataset_tinyimg(data_path,
+                             size_crops,
+                             nmb_crops,
+                             min_scale_crops,
+                             max_scale_crops,
+                             size_dataset=-1,
+                             return_index=False):
     
     assert len(size_crops) == len(nmb_crops)
     assert len(min_scale_crops) == len(nmb_crops)
     assert len(max_scale_crops) == len(nmb_crops)
-    
-    self.return_index = return_index
 
     trans = []
     color_transform = transforms.Compose([get_color_distortion(), RandomGaussianBlur()])
@@ -48,10 +45,8 @@ def MultiCropDataset_tinyimg(self,
             transforms.ToTensor(),
             transforms.Normalize(mean=mean, std=std)])
         ] * nmb_crops[i])
-        
-    self.trans = trans
     
-    train_transform = CropsTransform(self.trans)
+    train_transform = CropsTransform(trans)
     
     train_dataset = TinyImageNet(data_path, train=True, download=False, transform=train_transform)
     

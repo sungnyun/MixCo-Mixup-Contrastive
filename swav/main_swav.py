@@ -44,9 +44,9 @@ parser = argparse.ArgumentParser(description="Implementation of SwAV")
 #########################
 #### data parameters ####
 #########################
-parser.add_argument("--dataset", type=str, default="../data/tiny-imagenet-200",
+parser.add_argument("--dataset", type=str, default="tinyimg",
                     help="which dataset to use")
-parser.add_argument("--data_path", type=str, default="/path/to/imagenet",
+parser.add_argument("--data_path", type=str, default="../data/tiny-imagenet-200",
                     help="path to dataset repository")
 parser.add_argument("--nmb_crops", type=int, default=[2], nargs="+",
                     help="list of number of crops (example: [2, 6])")
@@ -351,8 +351,8 @@ def train(train_loader, model, optimizer, epoch, lr_schedule, queue, args):
         data_time.update(time.time() - end)
         
         if args.gpu is not None:
-            inputs[0] = inputs[0].cuda(args.gpu, non_blocking=True)
-            inputs[1] = inputs[1].cuda(args.gpu, non_blocking=True)
+            for ip in inputs[0]:
+                ip = ip.cuda(args.gpu, non_blocking=True)
 
         # update learning rate
         iteration = epoch * len(train_loader) + it
@@ -366,9 +366,9 @@ def train(train_loader, model, optimizer, epoch, lr_schedule, queue, args):
             model.module.prototypes.weight.copy_(w)
 
         # ============ multi-res forward passes ... ============
-        embedding, output = model(inputs)
+        embedding, output = model(inputs[0])
         embedding = embedding.detach()
-        bs = inputs[0].size(0)
+        bs = inputs[1].size(0)
 
         # ============ swav loss ... ============
         loss = 0
@@ -414,7 +414,7 @@ def train(train_loader, model, optimizer, epoch, lr_schedule, queue, args):
         optimizer.step()
 
         # ============ misc ... ============
-        losses.update(loss.item(), inputs[0].size(0))
+        losses.update(loss.item(), inputs[1].size(0))
         batch_time.update(time.time() - end)
         end = time.time()
         if args.rank ==0 and it % 50 == 0:

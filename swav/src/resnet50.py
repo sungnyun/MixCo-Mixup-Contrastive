@@ -366,8 +366,10 @@ class ResNet(nn.Module):
             _out = self.forward_backbone(torch.cat(inputs[start_idx: end_idx]).cuda(self.gpu, non_blocking=True))
             if start_idx == 0:
                 output = _out
+                print(output.shape)
             else:
                 output = torch.cat((output, _out))
+                print(output.shape)
             start_idx = end_idx
         return self.forward_head(output)
 
