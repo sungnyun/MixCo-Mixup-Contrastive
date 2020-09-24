@@ -12,7 +12,7 @@ def parse_args():
     parser.add_argument('--data-path', metavar='DIR', default='./data/tiny-imagenet',
                         help='path to dataset')
     parser.add_argument('--dataset', metavar='DATA', default='tiny-imagenet',
-                        help='name of dataset')
+                        choices=['cifar10', 'cifar100', 'tiny-imagenet', 'imagenet'])
     parser.add_argument('-j', '--num-workers', default=32, type=int, metavar='N',
                         help='number of data loading workers (default: 32)')
     parser.add_argument('-b', '--batch-size', default=256, type=int,
