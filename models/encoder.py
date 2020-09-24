@@ -34,8 +34,8 @@ class Encoder(nn.Module):
         # create the encoders
         # num_classes is the output fc dimension
         norm_layer = SplitBatchNorm if single_gpu else None
-        self.encoder_q = base_encoder(num_classes=dim, norm_layer=norm_layer, num_splits=num_splits)
-        self.encoder_k = base_encoder(num_classes=dim, norm_layer=norm_layer, num_splits=num_splits)
+        self.encoder_q = base_encoder(num_classes=dim)
+        self.encoder_k = base_encoder(num_classes=dim)
 
         if mlp:  # hack: brute-force replacement
             dim_mlp = self.encoder_q.fc.weight.shape[1]

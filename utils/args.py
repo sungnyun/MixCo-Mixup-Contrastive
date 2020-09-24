@@ -43,6 +43,8 @@ def parse_args():
                         dest='weight_decay')
     parser.add_argument('-p', '--print-freq', default=10, type=int,
                         metavar='N', help='print frequency (default: 10)')
+    parser.add_argument('--save-freq', default=-1, type=int,
+                        help='model save frequency (default: -1)')
     parser.add_argument('--resume', default='', type=str, metavar='PATH',
                         help='path to latest checkpoint (default: none)')
                         

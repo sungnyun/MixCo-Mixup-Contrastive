@@ -9,6 +9,7 @@ import torch.utils.data
 import torch.utils.data.distributed
 import torchvision.transforms as transforms
 import torchvision.datasets as datasets
+import torchvision.models as models
 
 import os, random, shutil, time, warnings, builtins, argparse, json
 
@@ -17,9 +18,9 @@ from models import *
 from models.base_encoder.bn import *
 from utils import *
 
-MODEL_NAMES = sorted(name for name in base_encoder.__dict__
+MODEL_NAMES = sorted(name for name in models.__dict__
     if name.islower() and not name.startswith("__")
-    and callable(base_encoder.__dict__[name]))
+    and callable(models.__dict__[name]))
 NUM_CLASSES = {'cifar10': 10, 'cifar100': 100, 'tiny-imagenet': 200, 'imagenet':1000}
 
 best_acc1 = 0
@@ -89,7 +90,7 @@ def main_worker(gpu, ngpus_per_node, args):
     # create model
     print("=> creating model '{}'".format(args.arch))
     norm_layer = SplitBatchNorm if args.single_gpu else None
-    model = base_encoder.__dict__[args.arch](num_classes=NUM_CLASSES[args.dataset], 
+    model = models.__dict__[args.arch](num_classes=NUM_CLASSES[args.dataset], 
                                              norm_layer=norm_layer,
                                              num_splits=int(args.batch_size/2))
     print(model)

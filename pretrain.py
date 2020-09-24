@@ -10,6 +10,7 @@ import torch.utils.data
 import torch.utils.data.distributed
 import torchvision.transforms as transforms
 import torchvision.datasets as datasets
+import torchvision.models as models
 
 import os, math, random, time, shutil, builtins, argparse, warnings, json
 
@@ -17,9 +18,9 @@ from data_utils import *
 from models import *
 from utils import *
 
-MODEL_NAMES = sorted(name for name in base_encoder.__dict__
+MODEL_NAMES = sorted(name for name in models.__dict__
     if name.islower() and not name.startswith("__")
-    and callable(base_encoder.__dict__[name]))
+    and callable(models.__dict__[name]))
 
 
 def main():
@@ -86,7 +87,7 @@ def main_worker(gpu, ngpus_per_node, args):
     # create model
     print("=> creating model '{}'".format(args.arch))
     
-    model = Encoder(base_encoder.__dict__[args.arch], 
+    model = Encoder(models.__dict__[args.arch], 
                     args.algo, 
                     dim=args.moco_dim, 
                     num_splits=int(args.batch_size/2),
@@ -134,6 +135,21 @@ def main_worker(gpu, ngpus_per_node, args):
     args.mix_param = 0.0 if args.algo == 'moco' else args.mix_param
     criterion = MixcoLoss(args.mix_param).cuda(args.gpu)
 
+    if args.resume:
+        if os.path.isfile(args.resume):
+            print("=> loading checkpoint '{}'".format(args.resume))
+            if args.gpu is None:
+                checkpoint = torch.load(args.resume)
+            else:
+                loc = 'cuda:{}'.format(args.gpu)
+                checkpoint = torch.load(args.resume, map_location=loc)
+            args.start_epoch = checkpoint['epoch']
+            model.load_state_dict(checkpoint['state_dict'])
+            optimizer.load_state_dict(checkpoint['optimizer'])
+            print("=> loaded checkpoint '{}' (epoch {})".format(args.resume, checkpoint['epoch']))
+        else:
+            print("=> no checkpoint found at '{}'".format(args.resume))
+
     cudnn.benchmark = True
 
     # Data loader
@@ -153,7 +169,16 @@ def main_worker(gpu, ngpus_per_node, args):
 
         # train for one epoch
         acc1, acc5 = train(train_loader, model, optimizer, criterion, epoch+1, args)
-
+        
+        if args.save_freq != -1 and (epoch+1) % args.save_freq == 0: 
+            if not args.multiprocessing_distributed or (args.multiprocessing_distributed and args.rank % ngpus_per_node == 0):
+                save_checkpoint({
+                    'epoch': epoch+1,
+                    'arch': args.arch,
+                    'state_dict': model.state_dict(),
+                    'optimizer' : optimizer.state_dict(),
+                    }, is_best=False, path='./results/pretrained', filename='{}_{:04d}.pth.tar'.format(args.exp_name, epoch+1))
+ 
     # always saves at the end of training    
     else:
         if not args.multiprocessing_distributed or (args.multiprocessing_distributed and args.rank % ngpus_per_node == 0):
