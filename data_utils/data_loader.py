@@ -8,7 +8,7 @@ from .tinyimagenet import TinyImageNet
 from .augmentation import *
 
 # Data loader
-DATASETS = {'cifar10': CIFAR10, 'cifar100': CIFAR100, 'tiny-imagenet': TinyImageNet, 'imagenet': ImageNet}
+DATASETS = {'cifar10': CIFAR10, 'cifar100': CIFAR100, 'tiny-imagenet': TinyImageNet, 'imagenet': None}
 MEAN = {'cifar10': [0.4914, 0.4822, 0.4465], 'cifar100': [0.5071, 0.4867, 0.4408], 'tiny-imagenet': [0.485, 0.456, 0.406], 'imagenet': [0.485, 0.456, 0.406]}
 STD = {'cifar10': [0.2023, 0.1994, 0.2010], 'cifar100':[0.2675, 0.2565, 0.2761], 'tiny-imagenet': [0.229, 0.224, 0.225], 'imagenet': [0.229, 0.224, 0.225]}
 
