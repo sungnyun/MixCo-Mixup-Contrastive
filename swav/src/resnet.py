@@ -194,10 +194,13 @@ class ResNet(nn.Module):
             hidden_mlp=0,
             nmb_prototypes=0,
             eval_mode=False,
-            gpu=0
+            gpu=0,
+            mix=False
     ):
         super(ResNet, self).__init__()
         self.gpu = gpu
+        self.mix = mix
+        
         if norm_layer is None:
             norm_layer = nn.BatchNorm2d
         self._norm_layer = norm_layer
@@ -363,15 +366,25 @@ class ResNet(nn.Module):
         )[1], 0)
         start_idx = 0
         for end_idx in idx_crops:
+            if self.mix and start_idx == 0:
+                imgs_mix, lbls_mix = self.img_mixer(inputs[start_idx: end_idx])
+                mix_out = self.forward_backbone(imgs_mix.cuda(self.gpu, non_blockin=True))
+            
             _out = self.forward_backbone(torch.cat(inputs[start_idx: end_idx]).cuda(self.gpu, non_blocking=True))
             if start_idx == 0:
-                output = _out
-                print(output.shape)
+                if self.mix:
+                    output = mix_out
+                    output = torch.cat((output, _out))   # (bs*3) * k
+                else:
+                    output = _out   # (bs*2) * k
             else:
-                output = torch.cat((output, _out))
-                print(output.shape)
+                output = torch.cat((output, _out))   # (bs * 8) * k
             start_idx = end_idx
-        return self.forward_head(output)
+            
+        if not self.mix:
+            return self.forward_head(output)
+        else:
+            return self.forward_head(output), lbls_mix
 
 
 class MultiPrototypes(nn.Module):

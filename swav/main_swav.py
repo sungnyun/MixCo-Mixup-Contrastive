@@ -35,7 +35,7 @@ from src.utils import (
 )
 from src.multicropdataset import MultiCropDataset
 from src.multicropdataset_tinyimg import MultiCropDataset_tinyimg
-import src.resnet50 as resnet_models
+import src.resnet as resnet_models
 
 logger = getLogger()
 
@@ -129,6 +129,8 @@ parser.add_argument("--sync_bn", type=str, default="pytorch", help="synchronize 
 parser.add_argument("--dump_path", type=str, default=".",
                     help="experiment dump path for checkpoints and log")
 parser.add_argument("--seed", type=int, default=31, help="seed")
+
+parser.add_argument("--mix", action='store_true', help='use mixup or not')
 
 
 def main():
@@ -226,7 +228,8 @@ def main_worker(gpu, ngpus_per_node, logger, training_stats, args):
         hidden_mlp=args.hidden_mlp,
         output_dim=args.feat_dim,
         nmb_prototypes=args.nmb_prototypes,
-        gpu=args.gpu
+        gpu=args.gpu,
+        mix=args.mix
     )
     # synchronize batch norm layers
     if args.sync_bn == "pytorch":
@@ -366,7 +369,11 @@ def train(train_loader, model, optimizer, epoch, lr_schedule, queue, args):
             model.module.prototypes.weight.copy_(w)
 
         # ============ multi-res forward passes ... ============
-        embedding, output = model(inputs[0])
+        if not args.mix:
+            embedding, output = model(inputs[0])
+        else:
+            embedding, output, lbls_mix = model(inputs[0])
+            
         embedding = embedding.detach()
         bs = inputs[1].size(0)
 

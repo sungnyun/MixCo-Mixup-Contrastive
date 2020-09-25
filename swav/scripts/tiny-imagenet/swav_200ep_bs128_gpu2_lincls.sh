@@ -17,17 +17,17 @@
 #master_node=${SLURM_NODELIST:0:9}${SLURM_NODELIST:9:4}
 dist_url="tcp://"
 dist_url+="localhost"
-dist_url+=:10002
+dist_url+=:10003
 
 DATASET_PATH="../data/tiny-imagenet-200"
-EXPERIMENT_PATH="./experiments/swav_200ep_bs256_lincls"
+EXPERIMENT_PATH="./experiments/swav_200ep_bs128_gpu2_lincls"
 mkdir -p $EXPERIMENT_PATH
 
-python3.7 -u eval_linear.py \
+python -u eval_linear.py \
 --data_path $DATASET_PATH \
---pretrained './experiments/swav_200ep_bs256_pretrain/checkpoint.pth.tar' \
+--pretrained './experiments/swav_200ep_bs128_gpu2_pretrain/checkpoint.pth.tar' \
 --dist_url $dist_url \
 --arch resnet18 \
 --dump_path $EXPERIMENT_PATH \
 --multiprocessing-distributed \
---gpu 0 1
+--gpu 0 1 

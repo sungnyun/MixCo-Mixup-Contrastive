@@ -33,7 +33,7 @@ from src.utils import (
     init_distributed_mode,
     accuracy,
 )
-import src.resnet50 as resnet_models
+import src.resnet as resnet_models
 from src.tinyimagenet import TinyImageNet
 
 logger = getLogger()
