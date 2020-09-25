@@ -90,15 +90,16 @@ def main_worker(gpu, ngpus_per_node, args):
     # create model
     print("=> creating model '{}'".format(args.arch))
     norm_layer = SplitBatchNorm if args.single_gpu else None
-    model = models.__dict__[args.arch](num_classes=NUM_CLASSES[args.dataset], 
-                                             norm_layer=norm_layer,
-                                             num_splits=int(args.batch_size/2))
+    model = models.__dict__[args.arch](num_classes=NUM_CLASSES[args.dataset]) 
+                                             #norm_layer=norm_layer,
+                                             #num_splits=int(args.batch_size/2))
     print(model)
 
-    # freeze all layers but the last fc
-    for name, param in model.named_parameters():
-        if name not in ['fc.weight', 'fc.bias']:
-            param.requires_grad = False
+    if not args.supervised:
+        # freeze all layers but the last fc
+        for name, param in model.named_parameters():
+            if name not in ['fc.weight', 'fc.bias']:
+                param.requires_grad = False
             
     # init the fc layer
     model.fc.weight.data.normal_(mean=0.0, std=0.01)
@@ -138,6 +139,9 @@ def main_worker(gpu, ngpus_per_node, args):
             print("=> loaded pre-trained model '{}'".format(args.pretrained))
         else:
             print("=> no checkpoint found at '{}'".format(args.pretrained))
+    else:
+        assert args.supervised
+        print("=> supervised learning without pretrain")
 
     if args.distributed:
         # For multiprocessing distributed, DistributedDataParallel constructor
@@ -173,7 +177,8 @@ def main_worker(gpu, ngpus_per_node, args):
 
     # optimize only the linear classifier
     parameters = list(filter(lambda p: p.requires_grad, model.parameters()))
-    assert len(parameters) == 2  # fc.weight, fc.bias
+    if not args.supervised:
+        assert len(parameters) == 2  # fc.weight, fc.bias
     optimizer = torch.optim.SGD(parameters, args.lr,
                                 momentum=args.momentum,
                                 weight_decay=args.weight_decay)

@@ -84,12 +84,13 @@ def parse_args():
                         help='use moco v2 data augmentation')
     parser.add_argument('--mix-param', default=1, type=float)
     parser.add_argument('--mixco-t', default=0.05, type=float,
-                        help='softmax temperature (default: 0.2)')
+                        help='softmax temperature (default: 0.05)')
 
     # lincls specific configs:
     parser.add_argument('-e', '--evaluate', dest='evaluate', action='store_true',
                         help='evaluate model on validation set')
-    parser.add_argument('--pretrained', default='', type=str,
+    parser.add_argument('--pretrained', default=None, type=str,
                         help='path to moco pretrained checkpoint')
+    parser.add_argument('--supervised', default=False, action='store_true')
 
     return parser.parse_args()
