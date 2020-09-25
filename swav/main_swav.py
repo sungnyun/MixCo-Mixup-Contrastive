@@ -372,7 +372,7 @@ def train(train_loader, model, optimizer, epoch, lr_schedule, queue, args):
         if not args.mix:
             embedding, output = model(inputs[0])
         else:
-            embedding, output, lbls_mix = model(inputs[0])
+            embedding, output, imgs_mix, lbls_mix = model(inputs[0])
             
         embedding = embedding.detach()
         bs = inputs[1].size(0)

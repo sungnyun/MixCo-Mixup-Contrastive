@@ -14,7 +14,7 @@ import torchvision.models as models
 import os, random, shutil, time, warnings, builtins, argparse, json
 
 from data_utils import *
-from models import *
+#from models import *
 from models.base_encoder.bn import *
 from utils import *
 
@@ -90,8 +90,8 @@ def main_worker(gpu, ngpus_per_node, args):
     # create model
     print("=> creating model '{}'".format(args.arch))
     norm_layer = SplitBatchNorm if args.single_gpu else None
-    model = models.__dict__[args.arch](num_classes=NUM_CLASSES[args.dataset]) 
-                                             #norm_layer=norm_layer,
+    model = models.__dict__[args.arch](num_classes=NUM_CLASSES[args.dataset], 
+                                             norm_layer=norm_layer,)
                                              #num_splits=int(args.batch_size/2))
     print(model)
 

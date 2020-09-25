@@ -357,6 +357,22 @@ class ResNet(nn.Module):
             return x, self.prototypes(x)
         return x
 
+    def img_mixer(self, out, end_idx):
+        B = int(out.shape[0]/end_idx)
+        assert out.shape[0] % end_idx == 0
+        
+        
+        
+        sid = int(B/2)
+        im_q1, im_q2 = im_q[:sid], im_q[sid:]
+        
+        # each image get different lambda
+        lam = torch.from_numpy(np.random.uniform(0, 1, size=(B,1,1,1))).float().to(self.gpu)
+        imgs_mix = lam * im_q1 + (1-lam) * im_q2
+        lbls_mix = torch.cat((torch.diag(lam.squeeze()), torch.diag((1-lam).squeeze())), dim=1)
+        
+        return imgs_mix, lbls_mix
+    
     def forward(self, inputs):
         if not isinstance(inputs, list):
             inputs = [inputs]
@@ -384,7 +400,7 @@ class ResNet(nn.Module):
         if not self.mix:
             return self.forward_head(output)
         else:
-            return self.forward_head(output), lbls_mix
+            return self.forward_head(output), imgs_mix, lbls_mix
 
 
 class MultiPrototypes(nn.Module):
