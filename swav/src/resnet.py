@@ -357,19 +357,16 @@ class ResNet(nn.Module):
             return x, self.prototypes(x)
         return x
 
-    def img_mixer(self, out, end_idx):
-        B = int(out.shape[0]/end_idx)
-        assert out.shape[0] % end_idx == 0
+    def img_mixer(self, inputs, end_idx):
+        assert len(inputs) % 2 == 0
         
-        
-        
-        sid = int(B/2)
-        im_q1, im_q2 = im_q[:sid], im_q[sid:]
+        ip1 , ip2 = inputs[0], inputs[1]
+        B = ip1.shape[0]
         
         # each image get different lambda
         lam = torch.from_numpy(np.random.uniform(0, 1, size=(B,1,1,1))).float().to(self.gpu)
-        imgs_mix = lam * im_q1 + (1-lam) * im_q2
-        lbls_mix = torch.cat((torch.diag(lam.squeeze()), torch.diag((1-lam).squeeze())), dim=1)
+        imgs_mix = lam * ip1 + (1-lam) * ip2
+        lbls_mix = lam.squeeze()
         
         return imgs_mix, lbls_mix
     
@@ -384,15 +381,11 @@ class ResNet(nn.Module):
         for end_idx in idx_crops:
             if self.mix and start_idx == 0:
                 imgs_mix, lbls_mix = self.img_mixer(inputs[start_idx: end_idx])
-                mix_out = self.forward_backbone(imgs_mix.cuda(self.gpu, non_blockin=True))
+                mix_out = self.forward_backbone(imgs_mix.cuda(self.gpu, non_blocking=True))
             
             _out = self.forward_backbone(torch.cat(inputs[start_idx: end_idx]).cuda(self.gpu, non_blocking=True))
             if start_idx == 0:
-                if self.mix:
-                    output = mix_out
-                    output = torch.cat((output, _out))   # (bs*3) * k
-                else:
-                    output = _out   # (bs*2) * k
+                output = _out   # (bs*2) * k
             else:
                 output = torch.cat((output, _out))   # (bs * 8) * k
             start_idx = end_idx
@@ -400,7 +393,7 @@ class ResNet(nn.Module):
         if not self.mix:
             return self.forward_head(output)
         else:
-            return self.forward_head(output), imgs_mix, lbls_mix
+            return self.forward_head(output), self.forward_head(mix_out), lbls_mix
 
 
 class MultiPrototypes(nn.Module):

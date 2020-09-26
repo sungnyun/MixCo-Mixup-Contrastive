@@ -89,8 +89,8 @@ def parse_args():
     # lincls specific configs:
     parser.add_argument('-e', '--evaluate', dest='evaluate', action='store_true',
                         help='evaluate model on validation set')
-    parser.add_argument('--pretrained', default=None, type=str,
+    parser.add_argument('--pretrained', default='', type=str,
                         help='path to moco pretrained checkpoint')
-    parser.add_argument('--supervised', default=False, action='store_true')
+    parser.add_argument('--supervised', action='store_true')
 
     return parser.parse_args()

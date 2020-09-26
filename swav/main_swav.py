@@ -372,13 +372,14 @@ def train(train_loader, model, optimizer, epoch, lr_schedule, queue, args):
         if not args.mix:
             embedding, output = model(inputs[0])
         else:
-            embedding, output, imgs_mix, lbls_mix = model(inputs[0])
+            embedding, output, _, mix_output, lbls_mix = model(inputs[0])
             
         embedding = embedding.detach()
         bs = inputs[1].size(0)
 
         # ============ swav loss ... ============
         loss = 0
+        q_list = []
         for i, crop_id in enumerate(args.crops_for_assign):
             with torch.no_grad():
                 out = output[bs * crop_id: bs * (crop_id + 1)]
@@ -397,14 +398,20 @@ def train(train_loader, model, optimizer, epoch, lr_schedule, queue, args):
                 # get assignments
                 q = torch.exp(out / args.epsilon).t()
                 q = distributed_sinkhorn(q, args.sinkhorn_iterations, args)[-bs:]
+                q_list.append(q)
 
             # cluster assignment prediction
             subloss = 0
             for v in np.delete(np.arange(np.sum(args.nmb_crops)), crop_id):
                 p = softmax(output[bs * v: bs * (v + 1)] / args.temperature)
                 subloss -= torch.mean(torch.sum(q * torch.log(p), dim=1))
-            loss += subloss / (np.sum(args.nmb_crops) - 1)
-        loss /= len(args.crops_for_assign)
+                
+            loss = loss + subloss / ((np.sum(args.nmb_crops) - 1) * len(args.crops_for_assign)) if not args.mix else loss + subloss / ((np.sum(args.nmb_crops) - 1) * len(args.crops_for_assign) + 1)
+            
+        if args.mix:
+            p = softmax(mix_output / args.temperature)
+            mix_q = lbls_mix * q_list[0] + (1 - lbls_mix) * q_list[1]
+            loss -= torch.mean(torch.sum(mix_q * torch.log(p), dim=1)) / ((np.sum(args.nmb_crops) - 1) * len(args.crops_for_assign) + 1)
 
         # ============ backward and optim step ... ============
         optimizer.zero_grad()
