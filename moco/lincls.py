@@ -179,10 +179,14 @@ def main_worker(gpu, ngpus_per_node, args):
     parameters = list(filter(lambda p: p.requires_grad, model.parameters()))
     if not args.supervised:
         assert len(parameters) == 2  # fc.weight, fc.bias
-    optimizer = torch.optim.SGD(parameters, args.lr,
-                                momentum=args.momentum,
-                                weight_decay=args.weight_decay)
-
+    
+    if args.optimizer == 'sgd':
+        optimizer = torch.optim.SGD(parameters, args.lr,
+                                    momentum=args.momentum,
+                                    weight_decay=args.weight_decay)
+    elif args.optimizer == 'adam':
+        optimizer = torch.optim.Adam(parameters, args.lr)
+    
     # optionally resume from a checkpoint
     if args.resume:
         if os.path.isfile(args.resume):
