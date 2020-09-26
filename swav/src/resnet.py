@@ -7,6 +7,7 @@
 
 import torch
 import torch.nn as nn
+import numpy as np
     
     
 def conv3x3(in_planes, out_planes, stride=1, groups=1, dilation=1):
@@ -357,7 +358,7 @@ class ResNet(nn.Module):
             return x, self.prototypes(x)
         return x
 
-    def img_mixer(self, inputs, end_idx):
+    def img_mixer(self, inputs):
         assert len(inputs) % 2 == 0
         
         ip1 , ip2 = inputs[0], inputs[1]
@@ -393,7 +394,10 @@ class ResNet(nn.Module):
         if not self.mix:
             return self.forward_head(output)
         else:
-            return self.forward_head(output), self.forward_head(mix_out), lbls_mix
+            embedding, output = self.forward_head(output)
+            _, mix_output = self.forward_head(mix_out)
+            
+            return embedding, output, _, mix_output, lbls_mix
 
 
 class MultiPrototypes(nn.Module):

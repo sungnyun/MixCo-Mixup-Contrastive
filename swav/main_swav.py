@@ -64,6 +64,8 @@ parser.add_argument("--crops_for_assign", type=int, nargs="+", default=[0, 1],
                     help="list of crops id used for computing assignments")
 parser.add_argument("--temperature", default=0.1, type=float,
                     help="temperature parameter in training loss")
+parser.add_argument("--mix_temperature", default=0.1, type=float,
+                    help="mix temperature parameter in training loss")
 parser.add_argument("--epsilon", default=0.05, type=float,
                     help="regularization parameter for Sinkhorn-Knopp algorithm")
 parser.add_argument("--sinkhorn_iterations", default=3, type=int,
@@ -409,8 +411,9 @@ def train(train_loader, model, optimizer, epoch, lr_schedule, queue, args):
             loss = loss + subloss / ((np.sum(args.nmb_crops) - 1) * len(args.crops_for_assign)) if not args.mix else loss + subloss / ((np.sum(args.nmb_crops) - 1) * len(args.crops_for_assign) + 1)
             
         if args.mix:
-            p = softmax(mix_output / args.temperature)
-            mix_q = lbls_mix * q_list[0] + (1 - lbls_mix) * q_list[1]
+            p = softmax(mix_output / args.mix_temperature)
+            
+            mix_q = lbls_mix.reshape(-1, 1) * q_list[0] + (1 - lbls_mix).reshape(-1, 1) * q_list[1]
             loss -= torch.mean(torch.sum(mix_q * torch.log(p), dim=1)) / ((np.sum(args.nmb_crops) - 1) * len(args.crops_for_assign) + 1)
 
         # ============ backward and optim step ... ============
