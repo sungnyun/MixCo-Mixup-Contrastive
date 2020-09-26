@@ -92,5 +92,6 @@ def parse_args():
     parser.add_argument('--pretrained', default='', type=str,
                         help='path to moco pretrained checkpoint')
     parser.add_argument('--supervised', action='store_true')
+    parser.add_argument('--optimizer', default='sgd', choices=['sgd', 'adam'])
 
     return parser.parse_args()
