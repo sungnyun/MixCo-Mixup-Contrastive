@@ -372,9 +372,9 @@ def train(train_loader, model, optimizer, epoch, lr_schedule, queue, args):
 
         # ============ multi-res forward passes ... ============
         if not args.mix:
-            embedding, output = model(inputs[0])
+            embedding, outputs = model(inputs[0])
         else:
-            embedding, output, _, mix_output, lbls_mix = model(inputs[0])
+            embedding, outputs, _, mix_outputs, lbls_mix = model(inputs[0])
             
         embedding = embedding.detach()
         bs = inputs[1].size(0)
@@ -384,7 +384,7 @@ def train(train_loader, model, optimizer, epoch, lr_schedule, queue, args):
         q_list = []
         for i, crop_id in enumerate(args.crops_for_assign):
             with torch.no_grad():
-                out = output[bs * crop_id: bs * (crop_id + 1)]
+                out = outputs[bs * crop_id: bs * (crop_id + 1)]
 
                 # time to use the queue
                 if queue is not None:
@@ -405,13 +405,13 @@ def train(train_loader, model, optimizer, epoch, lr_schedule, queue, args):
             # cluster assignment prediction
             subloss = 0
             for v in np.delete(np.arange(np.sum(args.nmb_crops)), crop_id):
-                p = softmax(output[bs * v: bs * (v + 1)] / args.temperature)
+                p = softmax(outputs[bs * v: bs * (v + 1)] / args.temperature)
                 subloss -= torch.mean(torch.sum(q * torch.log(p), dim=1))
                 
             loss = loss + subloss / ((np.sum(args.nmb_crops) - 1) * len(args.crops_for_assign)) if not args.mix else loss + subloss / ((np.sum(args.nmb_crops) - 1) * len(args.crops_for_assign) + 1)
             
         if args.mix:
-            p = softmax(mix_output / args.mix_temperature)
+            p = softmax(mix_outputs / args.mix_temperature)
             
             mix_q = lbls_mix.reshape(-1, 1) * q_list[0] + (1 - lbls_mix).reshape(-1, 1) * q_list[1]
             loss -= torch.mean(torch.sum(mix_q * torch.log(p), dim=1)) / ((np.sum(args.nmb_crops) - 1) * len(args.crops_for_assign) + 1)

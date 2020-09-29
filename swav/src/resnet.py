@@ -394,10 +394,10 @@ class ResNet(nn.Module):
         if not self.mix:
             return self.forward_head(output)
         else:
-            embedding, output = self.forward_head(output)
-            _, mix_output = self.forward_head(mix_out)
+            embedding, outputs = self.forward_head(output)
+            _, mix_outputs = self.forward_head(mix_out)
             
-            return embedding, output, _, mix_output, lbls_mix
+            return embedding, outputs, _, mix_outputs, lbls_mix
 
 
 class MultiPrototypes(nn.Module):
