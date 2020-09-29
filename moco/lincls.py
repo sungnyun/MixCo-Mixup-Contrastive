@@ -277,6 +277,8 @@ def train(train_loader, model, criterion, optimizer, epoch, args):
     no gradient), which are part of the model parameters too.
     """
     model.eval()
+    if args.supervised:
+        model.train()
 
     end = time.time()
     for i, (images, target) in enumerate(train_loader):
