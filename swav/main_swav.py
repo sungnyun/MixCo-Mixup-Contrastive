@@ -64,7 +64,7 @@ parser.add_argument("--crops_for_assign", type=int, nargs="+", default=[0, 1],
                     help="list of crops id used for computing assignments")
 parser.add_argument("--temperature", default=0.1, type=float,
                     help="temperature parameter in training loss")
-parser.add_argument("--mix_temperature", default=0.1, type=float,
+parser.add_argument("--mix_temperature", default=0.01, type=float,
                     help="mix temperature parameter in training loss")
 parser.add_argument("--epsilon", default=0.05, type=float,
                     help="regularization parameter for Sinkhorn-Knopp algorithm")
@@ -408,13 +408,15 @@ def train(train_loader, model, optimizer, epoch, lr_schedule, queue, args):
                 p = softmax(outputs[bs * v: bs * (v + 1)] / args.temperature)
                 subloss -= torch.mean(torch.sum(q * torch.log(p), dim=1))
                 
-            loss = loss + subloss / ((np.sum(args.nmb_crops) - 1) * len(args.crops_for_assign)) if not args.mix else loss + subloss / ((np.sum(args.nmb_crops) - 1) * len(args.crops_for_assign) + 1)
+            loss = loss + subloss / ((np.sum(args.nmb_crops) - 1) * len(args.crops_for_assign)) if not args.mix else loss + subloss / ((np.sum(args.nmb_crops) - 1) * len(args.crops_for_assign) + 2)
             
         if args.mix:
-            p = softmax(mix_outputs / args.mix_temperature)
-            
-            mix_q = lbls_mix.reshape(-1, 1) * q_list[0] + (1 - lbls_mix).reshape(-1, 1) * q_list[1]
-            loss -= torch.mean(torch.sum(mix_q * torch.log(p), dim=1)) / ((np.sum(args.nmb_crops) - 1) * len(args.crops_for_assign) + 1)
+            for idx, (mix_out, lbls) in enumerate(zip(mix_outputs, lbls_mix)):
+                p = softmax(mix_out / args.mix_temperature)
+
+                sid = mix_out.shape[0]
+                mix_q = lbls * q_list[1-idx][:sid] + (1-lbls) * q_list[1-idx][sid:]
+                loss -= torch.mean(torch.sum(mix_q * torch.log(p), dim=1)) / ((np.sum(args.nmb_crops) - 1) * len(args.crops_for_assign) + 2)
 
         # ============ backward and optim step ... ============
         optimizer.zero_grad()

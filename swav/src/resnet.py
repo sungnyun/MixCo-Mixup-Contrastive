@@ -359,15 +359,24 @@ class ResNet(nn.Module):
         return x
 
     def img_mixer(self, inputs):
-        assert len(inputs) % 2 == 0
+        B = inputs[0].shape[0]
+        assert B % 2 == 0
         
-        ip1 , ip2 = inputs[0], inputs[1]
-        B = ip1.shape[0]
+        sid = int(B/2)
+        ip_00, ip_01 = inputs[0][:sid], inputs[0][sid:]
+        ip_10, ip_11 = inputs[1][:sid], inputs[1][sid:]
         
         # each image get different lambda
-        lam = torch.from_numpy(np.random.uniform(0, 1, size=(B,1,1,1))).float().to(self.gpu)
-        imgs_mix = lam * ip1 + (1-lam) * ip2
-        lbls_mix = lam.squeeze()
+        lam = torch.from_numpy(np.random.uniform(0, 1, size=(sid,1,1,1))).float().to(self.gpu)
+        imgs_mix_0 = lam * ip_00 + (1-lam) * ip_01
+        lbls_mix_0 = lam.squeeze().reshape(-1, 1)
+        
+        lam = torch.from_numpy(np.random.uniform(0, 1, size=(sid,1,1,1))).float().to(self.gpu)
+        imgs_mix_1 = lam * ip_10 + (1-lam) * ip_11
+        lbls_mix_1 = lam.squeeze().reshape(-1, 1)
+                
+        imgs_mix = imgs_mix_0, imgs_mix_1
+        lbls_mix = lbls_mix_0, lbls_mix_1
         
         return imgs_mix, lbls_mix
     
@@ -382,7 +391,8 @@ class ResNet(nn.Module):
         for end_idx in idx_crops:
             if self.mix and start_idx == 0:
                 imgs_mix, lbls_mix = self.img_mixer(inputs[start_idx: end_idx])
-                mix_out = self.forward_backbone(imgs_mix.cuda(self.gpu, non_blocking=True))
+                mix_out_0 = self.forward_backbone(imgs_mix[0].cuda(self.gpu, non_blocking=True))
+                mix_out_1 = self.forward_backbone(imgs_mix[1].cuda(self.gpu, non_blocking=True))
             
             _out = self.forward_backbone(torch.cat(inputs[start_idx: end_idx]).cuda(self.gpu, non_blocking=True))
             if start_idx == 0:
@@ -395,7 +405,10 @@ class ResNet(nn.Module):
             return self.forward_head(output)
         else:
             embedding, outputs = self.forward_head(output)
-            _, mix_outputs = self.forward_head(mix_out)
+            _, mix_outputs_0 = self.forward_head(mix_out_0)
+            _, mix_outputs_1 = self.forward_head(mix_out_1)
+            
+            mix_outputs = mix_outputs_0, mix_outputs_1
             
             return embedding, outputs, _, mix_outputs, lbls_mix
 
