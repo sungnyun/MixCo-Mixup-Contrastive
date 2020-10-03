@@ -16,8 +16,6 @@ __all__ = ['data_loader']
 
     
 def data_loader(dataset, data_path, batch_size, num_workers, download=False, distributed=True, supervised=False):
-    normalize = transforms.Normalize(MEAN[dataset], STD[dataset])
-
     # for self-supervised learning (pretrain)
     if not supervised:
         s = 1
@@ -55,6 +53,8 @@ def data_loader(dataset, data_path, batch_size, num_workers, download=False, dis
     
     # for supervised learning (lincls)
     else:
+        normalize = transforms.Normalize(MEAN[dataset], STD[dataset])
+        
         train_transform = transforms.Compose([transforms.RandomResizedCrop(224),
                                           transforms.RandomHorizontalFlip(),
                                           transforms.ToTensor(),

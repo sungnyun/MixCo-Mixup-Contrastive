@@ -1,13 +1,13 @@
 import torch
 import torch.nn as nn
 from models.resnet_simclr import ResNetSimCLR
-from torch.utils.tensorboard import SummaryWriter
 import torch.nn.functional as F
 import torch.nn.parallel
 import torch.backends.cudnn as cudnn
 import torch.distributed as dist
 import torch.multiprocessing as mp
 from loss.nt_xent import NTXentLoss
+from loss.mix_loss import SoftCrossEntropy
 import os
 import shutil
 import sys
@@ -28,20 +28,7 @@ except:
     apex_support = False
 
 import numpy as np
-
-
-def fix_seed(seed):
-    # fix seed for reproducibility
-    np.random.seed(seed)
-    random.seed(seed)
-    torch.manual_seed(seed)
-    cudnn.deterministic = True
-    cudnn.benchmark = True
-    warnings.warn('You have chosen to seed training. '
-                  'This will turn on the CUDNN deterministic setting, '
-                  'which can slow down your training considerably! '
-                  'You may see unexpected behavior when restarting '
-                  'from checkpoints.')
+from utils import *
 
 
 def main():
@@ -145,13 +132,13 @@ def main_worker(gpu, ngpus_per_node, args):
                                               distributed=args.distributed, 
                                               supervised=False)
     
-    optimizer = torch.optim.Adam(model.parameters(), 3e-4, weight_decay=args.weight_decay)
-    #optimizer = torch.optim.SGD(model.parameters(), 0.015, momentum=0.9, weight_decay=args.weight_decay)
+    #optimizer = torch.optim.Adam(model.parameters(), 3e-4, weight_decay=args.weight_decay)
+    optimizer = torch.optim.SGD(model.parameters(), lr=args.lr, momentum=0.9, weight_decay=args.weight_decay)
 
     scheduler = torch.optim.lr_scheduler.CosineAnnealingLR(optimizer, T_max=len(train_loader), eta_min=0,
                                                            last_epoch=-1)
     
-    criterion = NTXentLoss(args.gpu, args.batch_size, args.mix_t, True).cuda(args.gpu)
+    criterion = NTXentLoss(args.gpu, args.batch_size, args.mix_temperature, True).cuda(args.gpu)
     
     if apex_support and args.fp16_precision:
         model, optimizer = amp.initialize(model, optimizer,
@@ -160,18 +147,10 @@ def main_worker(gpu, ngpus_per_node, args):
 
     cudnn.benchmark = True
     
-    writer = SummaryWriter()
-
-    writer.log_dir = args.log_dir
-    if not os.path.isdir(writer.log_dir):
-        os.makedirs(writer.log_dir)
-
-    model_checkpoints_folder = os.path.join(writer.log_dir, 'checkpoints')
-    
-    train(model, train_loader, train_sampler, writer, criterion, optimizer, scheduler, args)
+    train(model, train_loader, train_sampler, criterion, optimizer, scheduler, args)
 
 
-def _step(model, xis, xjs, n_iter, criterion):
+def _step(model, xis, xjs, criterion):
 
     # get the representations and the projections
     ris, zis = model(xis)  # [N,C]
@@ -184,10 +163,34 @@ def _step(model, xis, xjs, n_iter, criterion):
     zjs = F.normalize(zjs, dim=1)
 
     loss = criterion(zis, zjs)
+    return zis, zjs, loss
+
+
+def _mix_step(model, xis, xjs, zis, zjs, loss, args):
+    crit = SoftCrossEntropy()
+    B = xis.shape[0]
+    assert B % 2 == 0
+    sid = int(B/2)
+    
+    for x, z in zip([xis, xjs], [zjs, zis]):
+        x_1, x_2 = x[:sid], x[sid:]
+
+        # each image get different lambda
+        lam = torch.from_numpy(np.random.uniform(0, 1, size=(sid,1,1,1))).float().to(xis.device)
+        imgs_mix = lam * x_1 + (1-lam) * x_2
+
+        _, zis_mix = model(imgs_mix)
+        lbls_mix = torch.cat((torch.diag(lam.squeeze()), torch.diag((1-lam).squeeze())), dim=1)
+        zis_mix = F.normalize(zis_mix, dim=1)
+
+        logits_mix = torch.mm(zis_mix, z.transpose(0, 1)) # N/2 * N
+        logits_mix /= args.mix_temperature
+        loss += crit(logits_mix, lbls_mix) / 2
+        
     return loss
+    
 
-
-def train(model, train_loader, train_sampler, writer, criterion, optimizer, scheduler, args):
+def train(model, train_loader, train_sampler, criterion, optimizer, scheduler, args):
 
     n_iter = 0
     valid_n_iter = 0
@@ -205,12 +208,13 @@ def train(model, train_loader, train_sampler, writer, criterion, optimizer, sche
                 xis = xis.to(args.gpu)
                 xjs = xjs.to(args.gpu)
 
-                loss = _step(model, xis, xjs, n_iter, criterion)
+                zis, zjs, loss = _step(model, xis, xjs, criterion)
+                
+                loss = _mix_step(model, xis, xjs, zis, zjs, loss, args)
 
                 if n_iter % args.log_every_n_steps == 0:
                     print('Train loss of n_iter %d: %s' % (n_iter, loss.item()))
-                    writer.add_scalar('train_loss', loss, global_step=n_iter)
-
+                    
                 if apex_support and args.fp16_precision:
                     with amp.scale_loss(loss, optimizer) as scaled_loss:
                         scaled_loss.backward()
@@ -224,7 +228,8 @@ def train(model, train_loader, train_sampler, writer, criterion, optimizer, sche
             if epoch >= 10:
                 scheduler.step()
             print('Learning rate of epoch %d : %s' % (epoch, scheduler.get_lr()[0]))
-            writer.add_scalar('cosine_lr_decay', scheduler.get_lr()[0], global_step=n_iter)
+            
+            torch.save(model.state_dict(), os.path.join('./results/pretrained/', args.exp_name, 'checkpoint.pth'))
 
     
 if __name__ == "__main__":

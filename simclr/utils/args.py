@@ -7,7 +7,7 @@ def parse_args():
     parser = argparse.ArgumentParser(description='PyTorch ImageNet Training')
        
     # basic configs:
-    parser.add_argument('--log-dir', default='test', type=str,
+    parser.add_argument('--exp-name', default='test', type=str,
                         help='experiment_name')
     parser.add_argument('--data-path', metavar='DIR', default='./data/tiny-imagenet',
                         help='path to dataset')
@@ -26,15 +26,17 @@ def parse_args():
     # train configs:
     parser.add_argument('-a', '--arch', metavar='ARCH', default='resnet18',
                         help='model architecture')
-    parser.add_argument('--epochs', default=80, type=int, metavar='N',
+    parser.add_argument('--epochs', default=100, type=int, metavar='N',
                         help='number of total epochs to run')
     parser.add_argument('--start-epoch', default=0, type=int, metavar='N',
                         help='manual epoch number (useful on restarts)')
-    parser.add_argument('--lr', '--learning-rate', default=0.015, type=float,
+    parser.add_argument('--lr', '--learning-rate', default=0.075, type=float,
                         metavar='LR', help='initial learning rate', dest='lr')
+    parser.add_argument('--momentum', default=0.9, type=float,
+                        help='momentum value')
     parser.add_argument('--schedule', default=[120, 160], nargs='*', type=int,
                         help='learning rate schedule (when to drop lr by 10x)')
-    parser.add_argument('--wd', '--weight-decay', default=1e-5, type=float,
+    parser.add_argument('--wd', '--weight-decay', default=1e-4, type=float,
                         metavar='W', help='weight decay (default: 1e-4)',
                         dest='weight_decay')
     parser.add_argument('--log_every_n_steps', default=-1, type=int,
@@ -66,9 +68,9 @@ def parse_args():
                         help='whether to use mixup or not')
     parser.add_argument('--out-dim', default=256, type=int,
                         help='feature dimension (default: 256)')
-    parser.add_argument('--temperature', default=0.5, type=float,
+    parser.add_argument('--temperature', default=0.1, type=float,
                         help='softmax temperature (default: 0.5)')
-    parser.add_argument('--mix-t', default=0.01, type=float,
+    parser.add_argument('--mix-temperature', default=0.01, type=float,
                         help='softmax temperature (default: 0.01)')
 
     # lincls specific configs:
@@ -78,5 +80,8 @@ def parse_args():
                         help='path to simclr pretrained checkpoint')
     parser.add_argument('--supervised', action='store_true')
     parser.add_argument('--optimizer', default='sgd', choices=['sgd', 'adam'])
-
+    parser.add_argument('--cos', action='store_true')
+    parser.add_argument('-p', '--print-freq', default=10, type=int,
+                        metavar='N', help='print frequency (default: 10)')
+    
     return parser.parse_args()
