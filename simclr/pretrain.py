@@ -11,7 +11,6 @@ from loss.mix_loss import SoftCrossEntropy
 import os
 import shutil
 import sys
-import yaml
 import sys
 import builtins
 from data_aug import *
@@ -147,6 +146,9 @@ def main_worker(gpu, ngpus_per_node, args):
 
     cudnn.benchmark = True
     
+    if not os.path.isdir(os.path.join('./results/pretrained', args.exp_name)):
+        os.makedirs(os.path.join('./results/pretrained', args.exp_name))
+
     train(model, train_loader, train_sampler, criterion, optimizer, scheduler, args)
 
 
@@ -179,11 +181,11 @@ def _mix_step(model, xis, xjs, zis, zjs, loss, args):
         lam = torch.from_numpy(np.random.uniform(0, 1, size=(sid,1,1,1))).float().to(xis.device)
         imgs_mix = lam * x_1 + (1-lam) * x_2
 
-        _, zis_mix = model(imgs_mix)
+        _, z_mix = model(imgs_mix)
         lbls_mix = torch.cat((torch.diag(lam.squeeze()), torch.diag((1-lam).squeeze())), dim=1)
-        zis_mix = F.normalize(zis_mix, dim=1)
+        z_mix = F.normalize(z_mix, dim=1)
 
-        logits_mix = torch.mm(zis_mix, z.transpose(0, 1)) # N/2 * N
+        logits_mix = torch.mm(z_mix, z.transpose(0, 1)) # N/2 * N
         logits_mix /= args.mix_temperature
         loss += crit(logits_mix, lbls_mix) / 2
         
@@ -210,7 +212,8 @@ def train(model, train_loader, train_sampler, criterion, optimizer, scheduler, a
 
                 zis, zjs, loss = _step(model, xis, xjs, criterion)
                 
-                loss = _mix_step(model, xis, xjs, zis, zjs, loss, args)
+                if args.mix:
+                    loss = _mix_step(model, xis, xjs, zis, zjs, loss, args)
 
                 if n_iter % args.log_every_n_steps == 0:
                     print('Train loss of n_iter %d: %s' % (n_iter, loss.item()))

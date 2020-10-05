@@ -64,7 +64,7 @@ def parse_args():
                              'multi node data parallel training')
 
     # mixup specific configs:
-    parser.add_argument('--mix', default='store_true', 
+    parser.add_argument('--mix', action='store_true', 
                         help='whether to use mixup or not')
     parser.add_argument('--out-dim', default=256, type=int,
                         help='feature dimension (default: 256)')

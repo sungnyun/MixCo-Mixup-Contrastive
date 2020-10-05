@@ -79,7 +79,7 @@ def data_loader(dataset, data_path, batch_size, num_workers, download=False, dis
 
         train_loader = torch.utils.data.DataLoader(
             train_dataset, batch_size=batch_size, shuffle=(train_sampler is None),
-            num_workers=num_workers, pin_memory=True, sampler=train_sampler, drop_last=True)
+            num_workers=num_workers, pin_memory=True, sampler=train_sampler)
 
         val_loader = torch.utils.data.DataLoader(
             test_dataset, batch_size=batch_size, shuffle=False,
