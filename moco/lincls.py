@@ -242,6 +242,16 @@ def main_worker(gpu, ngpus_per_node, args):
         # remember best acc@1 and save checkpoint
         is_best = acc1 > best_acc1
         best_acc1 = max(acc1, best_acc1)
+        
+        if args.save_freq != -1 and (epoch+1) % args.save_freq == 0:
+            if not args.multiprocessing_distributed or (args.multiprocessing_distributed and args.rank % ngpus_per_node == 0):
+                save_checkpoint({
+                    'epoch': epoch + 1,
+                    'arch': args.arch,
+                    'state_dict': model.state_dict(),
+                    'best_acc1': best_acc1,
+                    'optimizer' : optimizer.state_dict(),
+                }, is_best=False, path='./results/lincls', filename='{}_{:03d}.pth.tar'.format(args.exp_name, epoch+1))
 
     # always saves at the end of training    
     else:
