@@ -28,6 +28,7 @@ best_acc1 = 0
 
 def main():
     args = parse_args()
+    args.weight_decay = 0.
     
     # check the base_encoder architecture
     assert args.arch in MODEL_NAMES
