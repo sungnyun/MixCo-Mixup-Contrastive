@@ -232,7 +232,7 @@ def train(model, train_loader, train_sampler, criterion, optimizer, scheduler, a
                 scheduler.step()
             print('Learning rate of epoch %d : %s' % (epoch, scheduler.get_lr()[0]))
             
-            torch.save(model.state_dict(), os.path.join('./results/pretrained/', args.exp_name, 'checkpoint.pth'))
+            torch.save(model.state_dict(), os.path.join('./results/pretrained/', args.exp_name, 'checkpoint.pth.tar'))
 
     
 if __name__ == "__main__":
