@@ -84,7 +84,7 @@ def update_json(exp_name, part='pretrain', acc=[0,0], path='./results/results.js
         with open(path, 'w') as f:
             json.dump({}, f)
 
-    with open(path, 'r') as f:
+    with open(path, 'r', encoding="UTF-8") as f:
         result_dict = json.load(f)
     
         if exp_name not in result_dict.keys():
