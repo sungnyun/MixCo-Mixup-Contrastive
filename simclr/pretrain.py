@@ -161,9 +161,6 @@ def main_worker(gpu, ngpus_per_node, args):
 
     cudnn.benchmark = True
     
-    if not os.path.isdir(os.path.join('./results/pretrained', args.exp_name)):
-        os.makedirs(os.path.join('./results/pretrained', args.exp_name))
-
     train(model, train_loader, train_sampler, criterion, optimizer, scheduler, args, ngpus_per_node)
            
 
