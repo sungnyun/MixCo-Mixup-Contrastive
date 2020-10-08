@@ -19,19 +19,17 @@ def data_loader(dataset, data_path, batch_size, num_workers, download=False, dis
     # for self-supervised learning (pretrain)
     if not supervised:
         s = 1
-        input_shape = (64, 64, 3)
         
         normalize = transforms.Normalize(MEAN[dataset], STD[dataset])
     
         # get a set of data augmentation transformations as described in the SimCLR paper.
         color_jitter = transforms.ColorJitter(0.8 * s, 0.8 * s, 0.8 * s, 0.2 * s)
-        augmentation = [transforms.RandomResizedCrop(size=input_shape[0]),
-                                              transforms.RandomHorizontalFlip(),
-                                              transforms.RandomApply([color_jitter], p=0.8),
-                                              transforms.RandomGrayscale(p=0.2),
-                                              GaussianBlur(kernel_size=int(0.1 * input_shape[0])),
-                                              transforms.ToTensor(),
-                                              normalize]
+        augmentation = [transforms.RandomHorizontalFlip(),
+                      transforms.RandomApply([color_jitter], p=0.8),
+                      transforms.RandomGrayscale(p=0.2),
+                      GaussianBlur(kernel_size=int(0.1 * 224)),
+                      transforms.ToTensor(),
+                      normalize]
         augmentation.insert(0, transforms.RandomResizedCrop(224, scale=(0.2, 1.)))
         
         train_transform = SimCLRDataTransform(transforms.Compose(augmentation))
