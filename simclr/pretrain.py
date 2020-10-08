@@ -134,10 +134,10 @@ def main_worker(gpu, ngpus_per_node, args):
     #optimizer = torch.optim.Adam(model.parameters(), 3e-4, weight_decay=args.weight_decay)
     optimizer = torch.optim.SGD(model.parameters(), lr=args.lr, momentum=0.9, weight_decay=args.weight_decay)
 
-    scheduler = torch.optim.lr_scheduler.CosineAnnealingLR(optimizer, T_max=len(train_loader), eta_min=0,
+    scheduler = torch.optim.lr_scheduler.CosineAnnealingLR(optimizer, T_max=args.epochs, eta_min=0,
                                                            last_epoch=-1)
     
-    criterion = NTXentLoss(args.gpu, args.batch_size, args.mix_temperature, True).cuda(args.gpu)
+    criterion = NTXentLoss(args.gpu, args.batch_size, args.temperature, True).cuda(args.gpu)
     
     if apex_support and args.fp16_precision:
         model, optimizer = amp.initialize(model, optimizer,
@@ -149,7 +149,7 @@ def main_worker(gpu, ngpus_per_node, args):
     if not os.path.isdir(os.path.join('./results/pretrained', args.exp_name)):
         os.makedirs(os.path.join('./results/pretrained', args.exp_name))
 
-    train(model, train_loader, train_sampler, criterion, optimizer, scheduler, args)
+    train(model, train_loader, train_sampler, criterion, optimizer, scheduler, args, ngpus_per_node)
 
 
 def _step(model, xis, xjs, criterion):
@@ -178,7 +178,7 @@ def _mix_step(model, xis, xjs, zis, zjs, loss, args):
         x_1, x_2 = x[:sid], x[sid:]
 
         # each image get different lambda
-        lam = torch.from_numpy(np.random.uniform(0, 1, size=(sid,1,1,1))).float().to(xis.device)
+        lam = torch.from_numpy(np.random.uniform(0, 1, size=(sid,1,1,1))).float().to(x.device)
         imgs_mix = lam * x_1 + (1-lam) * x_2
 
         _, z_mix = model(imgs_mix)
@@ -192,7 +192,7 @@ def _mix_step(model, xis, xjs, zis, zjs, loss, args):
     return loss
     
 
-def train(model, train_loader, train_sampler, criterion, optimizer, scheduler, args):
+def train(model, train_loader, train_sampler, criterion, optimizer, scheduler, args, ngpus_per_node):
 
     n_iter = 0
     valid_n_iter = 0
@@ -232,7 +232,9 @@ def train(model, train_loader, train_sampler, criterion, optimizer, scheduler, a
                 scheduler.step()
             print('Learning rate of epoch %d : %s' % (epoch, scheduler.get_lr()[0]))
             
-            torch.save(model.state_dict(), os.path.join('./results/pretrained/', args.exp_name, 'checkpoint.pth.tar'))
+            if args.rank % ngpus_per_node == 0:
+                print('Checkpoints saved!') 
+                torch.save(model.state_dict(), os.path.join('./results/pretrained/', args.exp_name, 'checkpoint.pth.tar'))
 
     
 if __name__ == "__main__":
