@@ -30,16 +30,16 @@ def parse_args():
                         help='number of total epochs to run')
     parser.add_argument('--start-epoch', default=0, type=int, metavar='N',
                         help='manual epoch number (useful on restarts)')
-    parser.add_argument('--lr', '--learning-rate', default=0.075, type=float,
+    parser.add_argument('--lr', '--learning-rate', default=0.3, type=float,
                         metavar='LR', help='initial learning rate', dest='lr')
     parser.add_argument('--momentum', default=0.9, type=float,
                         help='momentum value')
-    parser.add_argument('--schedule', default=[120, 160], nargs='*', type=int,
+    parser.add_argument('--schedule', default=[60, 80], nargs='*', type=int,
                         help='learning rate schedule (when to drop lr by 10x)')
     parser.add_argument('--wd', '--weight-decay', default=1e-6, type=float,
                         metavar='W', help='weight decay (default: 1e-6)',
                         dest='weight_decay')
-    parser.add_argument('--log_every_n_steps', default=-1, type=int,
+    parser.add_argument('--log_every_n_steps', default=10, type=int,
                         help='model save frequency (default: -1)')
     parser.add_argument("--fp16_precision", action='store_true',
                         help="whether to train with mixed precision or not")
@@ -66,11 +66,11 @@ def parse_args():
     # mixup specific configs:
     parser.add_argument('--mix', action='store_true', 
                         help='whether to use mixup or not')
-    parser.add_argument('--out-dim', default=256, type=int,
+    parser.add_argument('--out-dim', default=128, type=int,
                         help='feature dimension (default: 256)')
-    parser.add_argument('--temperature', default=0.1, type=float,
+    parser.add_argument('--temperature', default=0.5, type=float,
                         help='softmax temperature (default: 0.5)')
-    parser.add_argument('--mix-temperature', default=0.01, type=float,
+    parser.add_argument('--mix-temperature', default=0.05, type=float,
                         help='softmax temperature (default: 0.01)')
 
     # lincls specific configs:
