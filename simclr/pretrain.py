@@ -139,6 +139,21 @@ def main_worker(gpu, ngpus_per_node, args):
     
     criterion = NTXentLoss(args.gpu, args.batch_size, args.temperature, True).cuda(args.gpu)
     
+    if args.resume:
+        if os.path.isfile(args.resume):
+            print("=> loading checkpoint '{}'".format(args.resume))
+            if args.gpu is None:
+                checkpoint = torch.load(args.resume)
+            else:
+                loc = 'cuda:{}'.format(args.gpu)
+                checkpoint = torch.load(args.resume, map_location=loc)
+            args.start_epoch = checkpoint['epoch']
+            model.load_state_dict(checkpoint['state_dict'])
+            optimizer.load_state_dict(checkpoint['optimizer'])
+            print("=> loaded checkpoint '{}' (epoch {})".format(args.resume, checkpoint['epoch']))
+        else:
+            print("=> no checkpoint found at '{}'".format(args.resume))
+            
     if apex_support and args.fp16_precision:
         model, optimizer = amp.initialize(model, optimizer,
                                           opt_level='O2',
@@ -151,6 +166,15 @@ def main_worker(gpu, ngpus_per_node, args):
 
     train(model, train_loader, train_sampler, criterion, optimizer, scheduler, args, ngpus_per_node)
 
+    if not args.multiprocessing_distributed or (args.multiprocessing_distributed and args.rank % ngpus_per_node == 0):
+            save_checkpoint({
+                'epoch': epoch+1,
+                'arch': args.arch,
+                'state_dict': model.state_dict(),
+                'optimizer' : optimizer.state_dict(),
+            }, is_best=False, path='./results/pretrained', filename='{}.pth.tar'.format(args.exp_name))
+            
+#             update_json(args.exp_name, 'pretrain', [acc1.item(), acc5.item()])
 
 def _step(model, xis, xjs, criterion):
 
@@ -239,9 +263,14 @@ def train(model, train_loader, train_sampler, criterion, optimizer, scheduler, a
                 scheduler.step()
             print('Learning rate of epoch %d : %s' % (epoch, scheduler.get_last_lr()[0]))
             
-            if args.rank % ngpus_per_node == 0:
-                print('Checkpoints saved!') 
-                torch.save(model.state_dict(), os.path.join('./results/pretrained/', args.exp_name, 'checkpoint.pth.tar'))
+            if args.save_freq != -1 and (epoch+1) % args.save_freq == 0: 
+                if not args.multiprocessing_distributed or (args.multiprocessing_distributed and args.rank % ngpus_per_node == 0):
+                    save_checkpoint({
+                        'epoch': epoch+1,
+                        'arch': args.arch,
+                        'state_dict': model.state_dict(),
+                        'optimizer' : optimizer.state_dict(),
+                        }, is_best=False, path='./results/pretrained', filename='{}_{:04d}.pth.tar'.format(args.exp_name, epoch+1))
 
     
 if __name__ == "__main__":

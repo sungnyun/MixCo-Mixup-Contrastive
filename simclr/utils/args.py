@@ -84,4 +84,9 @@ def parse_args():
     parser.add_argument('-p', '--print-freq', default=10, type=int,
                         metavar='N', help='print frequency (default: 10)')
     
+    parser.add_argument('--resume', type=str, default='',
+                        help='path to simclr pretrained checkpoint')
+    parser.add_argument('--save-freq', type=int, default=-1,
+                        help='save frequency')
+    
     return parser.parse_args()

@@ -174,27 +174,27 @@ def main_worker(gpu, ngpus_per_node, args):
     elif args.optimizer == 'adam':
         optimizer = torch.optim.Adam(parameters, args.lr)
     
-#     # optionally resume from a checkpoint
-#     if args.resume:
-#         if os.path.isfile(args.resume):
-#             print("=> loading checkpoint '{}'".format(args.resume))
-#             if args.gpu is None:
-#                 checkpoint = torch.load(args.resume)
-#             else:
-#                 # Map model to be loaded to specified single gpu.
-#                 loc = 'cuda:{}'.format(args.gpu)
-#                 checkpoint = torch.load(args.resume, map_location=loc)
-#             args.start_epoch = checkpoint['epoch']
-#             best_acc1 = checkpoint['best_acc1']
-#             if args.gpu is not None:
-#                 # best_acc1 may be from a checkpoint from a different GPU
-#                 best_acc1 = best_acc1.to(args.gpu)
-#             model.load_state_dict(checkpoint['state_dict'])
-#             optimizer.load_state_dict(checkpoint['optimizer'])
-#             print("=> loaded checkpoint '{}' (epoch {})"
-#                   .format(args.resume, checkpoint['epoch']))
-#         else:
-#             print("=> no checkpoint found at '{}'".format(args.resume))
+    # optionally resume from a checkpoint
+    if args.resume:
+        if os.path.isfile(args.resume):
+            print("=> loading checkpoint '{}'".format(args.resume))
+            if args.gpu is None:
+                checkpoint = torch.load(args.resume)
+            else:
+                # Map model to be loaded to specified single gpu.
+                loc = 'cuda:{}'.format(args.gpu)
+                checkpoint = torch.load(args.resume, map_location=loc)
+            args.start_epoch = checkpoint['epoch']
+            best_acc1 = checkpoint['best_acc1']
+            if args.gpu is not None:
+                # best_acc1 may be from a checkpoint from a different GPU
+                best_acc1 = best_acc1.to(args.gpu)
+            model.load_state_dict(checkpoint['state_dict'])
+            optimizer.load_state_dict(checkpoint['optimizer'])
+            print("=> loaded checkpoint '{}' (epoch {})"
+                  .format(args.resume, checkpoint['epoch']))
+        else:
+            print("=> no checkpoint found at '{}'".format(args.resume))
 
     cudnn.benchmark = True
 
@@ -228,6 +228,17 @@ def main_worker(gpu, ngpus_per_node, args):
         is_best = acc1 > best_acc1
         best_acc1 = max(acc1, best_acc1)
 
+        if not args.multiprocessing_distributed or (args.multiprocessing_distributed and args.rank % ngpus_per_node == 0):
+            save_checkpoint({
+                'epoch': epoch + 1,
+                'arch': args.arch,
+                'state_dict': model.state_dict(),
+                'best_acc1': best_acc1,
+                'optimizer' : optimizer.state_dict(),
+            }, is_best=is_best, path='./results/lincls', filename='{}_{:04d}.pth.tar'.format(args.exp_name, epoch+1))
+        if epoch == args.start_epoch:
+            sanity_check(model.state_dict(), args.pretrained)
+                
     # always saves at the end of training    
     else:
         if not args.multiprocessing_distributed or (args.multiprocessing_distributed and args.rank % ngpus_per_node == 0):
