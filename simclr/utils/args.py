@@ -36,8 +36,8 @@ def parse_args():
                         help='momentum value')
     parser.add_argument('--schedule', default=[120, 160], nargs='*', type=int,
                         help='learning rate schedule (when to drop lr by 10x)')
-    parser.add_argument('--wd', '--weight-decay', default=1e-4, type=float,
-                        metavar='W', help='weight decay (default: 1e-4)',
+    parser.add_argument('--wd', '--weight-decay', default=1e-6, type=float,
+                        metavar='W', help='weight decay (default: 1e-6)',
                         dest='weight_decay')
     parser.add_argument('--log_every_n_steps', default=-1, type=int,
                         help='model save frequency (default: -1)')

@@ -63,4 +63,4 @@ class NTXentLoss(torch.nn.Module):
         loss = self.criterion(logits, labels)
         loss = loss / (2 * self.batch_size)
 
-        return loss
+        return logits, labels, loss
