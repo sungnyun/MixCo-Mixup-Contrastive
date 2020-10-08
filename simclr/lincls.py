@@ -236,8 +236,6 @@ def main_worker(gpu, ngpus_per_node, args):
                 'best_acc1': best_acc1,
                 'optimizer' : optimizer.state_dict(),
             }, is_best=is_best, path='./results/lincls', filename='{}_{:04d}.pth.tar'.format(args.exp_name, epoch+1))
-        if epoch == args.start_epoch:
-            sanity_check(model.state_dict(), args.pretrained)
                 
     # always saves at the end of training    
     else:
@@ -249,8 +247,6 @@ def main_worker(gpu, ngpus_per_node, args):
                 'best_acc1': best_acc1,
                 'optimizer' : optimizer.state_dict(),
             }, is_best=is_best, path='./results/lincls', filename='{}.pth.tar'.format(args.exp_name))
-            if epoch == args.start_epoch:
-                sanity_check(model.state_dict(), args.pretrained)
                 
         update_json(args.exp_name, 'lincls', [best_acc1.item(), acc5.item()])
 
