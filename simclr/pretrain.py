@@ -165,16 +165,7 @@ def main_worker(gpu, ngpus_per_node, args):
         os.makedirs(os.path.join('./results/pretrained', args.exp_name))
 
     train(model, train_loader, train_sampler, criterion, optimizer, scheduler, args, ngpus_per_node)
-
-    if not args.multiprocessing_distributed or (args.multiprocessing_distributed and args.rank % ngpus_per_node == 0):
-            save_checkpoint({
-                'epoch': args.epochs+1,
-                'arch': args.arch,
-                'state_dict': model.state_dict(),
-                'optimizer' : optimizer.state_dict(),
-            }, is_best=False, path='./results/pretrained', filename='{}.pth.tar'.format(args.exp_name))
-            
-#             update_json(args.exp_name, 'pretrain', [acc1.item(), acc5.item()])
+           
 
 def _step(model, xis, xjs, criterion):
 
@@ -225,7 +216,7 @@ def train(model, train_loader, train_sampler, criterion, optimizer, scheduler, a
     
     model.train()
     with torch.autograd.set_detect_anomaly(True):
-        for epoch in range(args.epochs):
+        for epoch in range(args.start_epoch, args.epochs):
             if args.distributed:
                 train_sampler.set_epoch(epoch)
 
@@ -272,6 +263,14 @@ def train(model, train_loader, train_sampler, criterion, optimizer, scheduler, a
                         'optimizer' : optimizer.state_dict(),
                         }, is_best=False, path='./results/pretrained', filename='{}_{:04d}.pth.tar'.format(args.exp_name, epoch+1))
 
+    if not args.multiprocessing_distributed or (args.multiprocessing_distributed and args.rank % ngpus_per_node == 0):
+        save_checkpoint({
+            'epoch': args.epochs,
+            'arch': args.arch,
+            'state_dict': model.state_dict(),
+            'optimizer' : optimizer.state_dict(),
+        }, is_best=False, path='./results/pretrained', filename='{}.pth.tar'.format(args.exp_name))
+     
     
 if __name__ == "__main__":
     main()

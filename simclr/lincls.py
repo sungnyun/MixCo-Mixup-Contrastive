@@ -104,8 +104,9 @@ def main_worker(gpu, ngpus_per_node, args):
     if args.pretrained:
         if os.path.isfile(args.pretrained):
             print("=> loading checkpoint '{}'".format(args.pretrained))
-            state_dict = torch.load(args.pretrained, map_location="cpu")
+            checkpoint = torch.load(args.pretrained, map_location="cpu")
             #print(checkpoint['state_dict'].keys())
+            state_dict = checkpoint['state_dict']
             # rename pre-trained keys
             if args.distributed:
                 for k in list(state_dict.keys()):
@@ -120,7 +121,6 @@ def main_worker(gpu, ngpus_per_node, args):
 
             args.start_epoch = 0
             msg = model.load_state_dict(state_dict, strict=False)
-            #print(state_dict.keys())
             assert set(msg.missing_keys) == {'fc.weight', 'fc.bias'}
 
             print("=> loaded pre-trained model '{}'".format(args.pretrained))

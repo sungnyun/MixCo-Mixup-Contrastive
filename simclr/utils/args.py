@@ -88,5 +88,5 @@ def parse_args():
                         help='path to simclr pretrained checkpoint')
     parser.add_argument('--save-freq', type=int, default=-1,
                         help='save frequency')
-    
+
     return parser.parse_args()
