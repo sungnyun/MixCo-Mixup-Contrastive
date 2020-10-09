@@ -201,7 +201,7 @@ def main_worker(gpu, ngpus_per_node, logger, training_stats, args):
 
     # build model
     model = resnet_models.__dict__[args.arch](output_dim=0, eval_mode=True, gpu=args.gpu)
-    linear_classifier = RegLog(NUM_CLASSES[args.dataset], args.arch, global_avg=False, use_bn=False)
+    linear_classifier = RegLog(NUM_CLASSES[args.dataset], args.arch, global_avg=True, use_bn=False)
 
     # convert batch norm layers (if any)
     linear_classifier = nn.SyncBatchNorm.convert_sync_batchnorm(linear_classifier)
