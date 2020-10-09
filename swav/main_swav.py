@@ -32,6 +32,7 @@ from src.utils import (
     fix_random_seeds,
     AverageMeter,
     init_distributed_mode,
+    accuracy,
 )
 from src.multicropdataset import MultiCropDataset
 from src.multicropdataset_tinyimg import MultiCropDataset_tinyimg
@@ -130,8 +131,8 @@ parser.add_argument("--use_fp16", type=bool_flag, default=True,
 parser.add_argument("--sync_bn", type=str, default="pytorch", help="synchronize bn")
 parser.add_argument("--dump_path", type=str, default=".",
                     help="experiment dump path for checkpoints and log")
+parser.add_argument("--log_every_n_steps", type=int, default=10, help="log frequency")
 parser.add_argument("--seed", type=int, default=31, help="seed")
-
 parser.add_argument("--mix", action='store_true', help='use mixup or not')
 
 
@@ -191,6 +192,8 @@ def main_worker(gpu, ngpus_per_node, logger, training_stats, args):
             # For multiprocessing distributed training, rank needs to be the
             # global rank among all the processes
             args.rank = args.rank * ngpus_per_node + gpu
+            args.batch_size = int(args.batch_size / ngpus_per_node)
+            args.workers = int((args.workers + ngpus_per_node - 1) / ngpus_per_node)
         dist.init_process_group(backend="nccl", init_method=args.dist_url,
                                 world_size=args.world_size, rank=args.rank)
     
@@ -351,6 +354,7 @@ def train(train_loader, model, optimizer, epoch, lr_schedule, queue, args):
     use_the_queue = False
 
     end = time.time()
+    avg_subloss = avg_mix_loss = avg_acc = n_iter = 0
     for it, inputs in enumerate(train_loader):
         # measure data loading time
         data_time.update(time.time() - end)
@@ -407,16 +411,30 @@ def train(train_loader, model, optimizer, epoch, lr_schedule, queue, args):
             for v in np.delete(np.arange(np.sum(args.nmb_crops)), crop_id):
                 p = softmax(outputs[bs * v: bs * (v + 1)] / args.temperature)
                 subloss -= torch.mean(torch.sum(q * torch.log(p), dim=1))
-                
+                if crop_id == 0 and v == 1:
+                    acc1 = accuracy(p, torch.max(q, 1)[1])
             loss = loss + subloss / ((np.sum(args.nmb_crops) - 1) * len(args.crops_for_assign)) if not args.mix else loss + subloss / ((np.sum(args.nmb_crops) - 1) * len(args.crops_for_assign) + 2)
+
+        avg_acc += acc1[0].item()
+        avg_subloss += loss.item()
             
+        mix_loss = 0
         if args.mix:
             for idx, (mix_out, lbls) in enumerate(zip(mix_outputs, lbls_mix)):
                 p = softmax(mix_out / args.mix_temperature)
-
                 sid = mix_out.shape[0]
                 mix_q = lbls * q_list[1-idx][:sid] + (1-lbls) * q_list[1-idx][sid:]
-                loss -= torch.mean(torch.sum(mix_q * torch.log(p), dim=1)) / ((np.sum(args.nmb_crops) - 1) * len(args.crops_for_assign) + 2)
+                mix_loss -= torch.mean(torch.sum(mix_q * torch.log(p), dim=1)) / ((np.sum(args.nmb_crops) - 1) * len(args.crops_for_assign) + 2)
+
+            loss += mix_loss
+            avg_mix_loss += mix_loss.item()
+
+        # loggging
+        n_iter += 1
+        if args.log_every_n_steps != -1 and n_iter % args.log_every_n_steps == 0:
+            print('iter {:d}: subloss {:.6f}, mixloss {:.6f} acc@1 {:.2f}'.format(
+                n_iter, avg_subloss/args.log_every_n_steps, avg_mix_loss/args.log_every_n_steps, avg_acc/args.log_every_n_steps))
+            avg_subloss = avg_mix_loss = avg_acc = 0
 
         # ============ backward and optim step ... ============
         optimizer.zero_grad()
