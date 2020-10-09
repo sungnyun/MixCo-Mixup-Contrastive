@@ -47,6 +47,7 @@ parser = argparse.ArgumentParser(description="Evaluate models: Linear classifica
 parser.add_argument("--dump_path", type=str, default=".",
                     help="experiment dump path for checkpoints and log")
 parser.add_argument("--seed", type=int, default=31, help="seed")
+parser.add_argument("--dataset", type=str, default="tiny-imagenet")
 parser.add_argument("--data_path", type=str, default="/path/to/imagenet",
                     help="path to dataset repository")
 parser.add_argument("--workers", default=10, type=int,
@@ -67,12 +68,12 @@ parser.add_argument("--use_bn", default=False, type=bool_flag,
 #########################
 parser.add_argument("--epochs", default=100, type=int,
                     help="number of total epochs to run")
-parser.add_argument("--batch_size", default=32, type=int,
+parser.add_argument("--batch_size", default=256, type=int,
                     help="batch size per gpu, i.e. how many unique instances per gpu")
 parser.add_argument("--lr", default=0.3, type=float, help="initial learning rate")
-parser.add_argument("--wd", default=1e-6, type=float, help="weight decay")
+parser.add_argument("--wd", default=0., type=float, help="weight decay")
 parser.add_argument("--nesterov", default=False, type=bool_flag, help="nesterov momentum")
-parser.add_argument("--scheduler_type", default="cosine", type=str, choices=["step", "cosine"])
+parser.add_argument("--scheduler_type", default="step", type=str, choices=["step", "cosine"])
 # for multi-step learning rate decay
 parser.add_argument("--decay_epochs", type=int, nargs="+", default=[60, 80],
                     help="Epochs at which to decay learning rate.")
@@ -100,6 +101,7 @@ parser.add_argument('--multiprocessing-distributed', action='store_true',
                          'fastest way to use PyTorch for either single node or '
                          'multi node data parallel training')
 
+NUM_CLASSES = {'cifar10': 10, 'cifar100': 100, 'tiny-imagenet': 200, 'imagenet':1000}
 
 def main():
     global args, best_acc
@@ -199,7 +201,7 @@ def main_worker(gpu, ngpus_per_node, logger, training_stats, args):
 
     # build model
     model = resnet_models.__dict__[args.arch](output_dim=0, eval_mode=True, gpu=args.gpu)
-    linear_classifier = RegLog(1000, args.arch, args.global_pooling, args.use_bn)
+    linear_classifier = RegLog(NUM_CLASSES[args.dataset], args.arch, global_avg=False, use_bn=False)
 
     # convert batch norm layers (if any)
     linear_classifier = nn.SyncBatchNorm.convert_sync_batchnorm(linear_classifier)

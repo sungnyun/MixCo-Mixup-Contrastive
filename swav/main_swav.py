@@ -134,6 +134,7 @@ parser.add_argument("--dump_path", type=str, default=".",
 parser.add_argument("--log_every_n_steps", type=int, default=10, help="log frequency")
 parser.add_argument("--seed", type=int, default=31, help="seed")
 parser.add_argument("--mix", action='store_true', help='use mixup or not')
+parser.add_argument("--hard_mix", action='store_true', help='use hard mix_q')
 
 
 def main():
@@ -423,7 +424,12 @@ def train(train_loader, model, optimizer, epoch, lr_schedule, queue, args):
             for idx, (mix_out, lbls) in enumerate(zip(mix_outputs, lbls_mix)):
                 p = softmax(mix_out / args.mix_temperature)
                 sid = mix_out.shape[0]
-                mix_q = lbls * q_list[1-idx][:sid] + (1-lbls) * q_list[1-idx][sid:]
+                if args.hard_mix:
+                    q1, q2 = q_list[1-idx][:sid].argmax(dim=1), q_list[1-idx][sid:].argmax(dim=1)
+                    q1, q2 = nn.functional.one_hot(q1, p.size(1)), nn.functional.one_hot(q2, p.size(1))
+                    mix_q = lbls * q1 + (1-lbls) * q2
+                else:
+                    mix_q = lbls * q_list[1-idx][:sid] + (1-lbls) * q_list[1-idx][sid:]
                 mix_loss -= torch.mean(torch.sum(mix_q * torch.log(p), dim=1)) / ((np.sum(args.nmb_crops) - 1) * len(args.crops_for_assign) + 2)
 
             loss += mix_loss
