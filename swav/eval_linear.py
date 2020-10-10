@@ -71,7 +71,7 @@ parser.add_argument("--epochs", default=100, type=int,
                     help="number of total epochs to run")
 parser.add_argument("--batch_size", default=256, type=int,
                     help="batch size per gpu, i.e. how many unique instances per gpu")
-parser.add_argument("--lr", default=0.3, type=float, help="initial learning rate")
+parser.add_argument("--lr", default=3.0, type=float, help="initial learning rate")
 parser.add_argument("--wd", default=0., type=float, help="weight decay")
 parser.add_argument("--nesterov", default=False, type=bool_flag, help="nesterov momentum")
 parser.add_argument("--scheduler_type", default="step", type=str, choices=["step", "cosine"])
