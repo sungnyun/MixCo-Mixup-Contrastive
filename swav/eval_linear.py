@@ -23,6 +23,7 @@ import torch.optim
 import torch.utils.data as data
 import torchvision.transforms as transforms
 import torchvision.datasets as datasets
+from torchvision.datasets import CIFAR10, CIFAR100, ImageFolder
 
 from src.utils import (
     bool_flag,
@@ -101,7 +102,10 @@ parser.add_argument('--multiprocessing-distributed', action='store_true',
                          'fastest way to use PyTorch for either single node or '
                          'multi node data parallel training')
 
+DATASETS = {'cifar10': CIFAR10, 'cifar100': CIFAR100, 'tiny-imagenet': TinyImageNet, 'imagenet': None}
 NUM_CLASSES = {'cifar10': 10, 'cifar100': 100, 'tiny-imagenet': 200, 'imagenet':1000}
+MEAN = {'cifar10': [0.4914, 0.4822, 0.4465], 'cifar100': [0.5071, 0.4867, 0.4408], 'tiny-imagenet': [0.485, 0.456, 0.406], 'imagenet': [0.485, 0.456, 0.406]}
+STD = {'cifar10': [0.2023, 0.1994, 0.2010], 'cifar100':[0.2675, 0.2565, 0.2761], 'tiny-imagenet': [0.229, 0.224, 0.225], 'imagenet': [0.229, 0.224, 0.225]}
 
 def main():
     global args, best_acc
@@ -164,7 +168,7 @@ def main_worker(gpu, ngpus_per_node, logger, training_stats, args):
         
     # build data
     tr_normalize = transforms.Normalize(
-        mean=[0.485, 0.456, 0.406], std=[0.229, 0.224, 0.225]
+        mean=MEAN[args.dataset], std=STD[args.dataset]
     )
     train_transform = transforms.Compose([
         transforms.RandomResizedCrop(224),
@@ -179,9 +183,15 @@ def main_worker(gpu, ngpus_per_node, logger, training_stats, args):
         tr_normalize,
     ])
     
-    train_dataset = TinyImageNet(args.data_path, train=True, download=False, transform=train_transform)
-    val_dataset = TinyImageNet(args.data_path, train=False, download=False, transform=val_transform)
-    
+    if args.dataset == 'imagenet':
+        traindir = os.path.join(args.data_path, 'train')
+        testdir = os.path.join(args.data_path, 'val')
+        train_dataset = ImageFolder(traindir, transform=train_transform)
+        val_dataset = ImageFolder(testdir, transform=val_transform)
+    else:
+        train_dataset = DATASETS[args.dataset](args.data_path, train=True, download=False, transform=train_transform)
+        val_dataset = DATASETS[args.dataset](args.data_path, train=False, download=False, transform=val_transform)
+   
     sampler = torch.utils.data.distributed.DistributedSampler(train_dataset)
     train_loader = torch.utils.data.DataLoader(
         train_dataset,
