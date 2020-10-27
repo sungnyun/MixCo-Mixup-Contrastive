@@ -1,6 +1,7 @@
 ## How to Reproduce our Results
 
 MixCo: Mix-up Contrastive Learning for Visual Representation (https://arxiv.org/abs/2010.06300)
+
 This is an instruction to reproduce our results, based on the source code we have provided.
 
 ### Prerequisites
