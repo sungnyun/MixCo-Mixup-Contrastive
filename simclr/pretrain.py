@@ -208,7 +208,7 @@ def train(model, train_loader, train_sampler, criterion, optimizer, scheduler, a
 
     n_iter = 0
     valid_n_iter = 0
-    avg_loss = avg_acc = 0
+    avg_loss = avg_mix_loss = avg_acc = 0
     best_valid_loss = np.inf
     
     model.train()
@@ -224,18 +224,20 @@ def train(model, train_loader, train_sampler, criterion, optimizer, scheduler, a
                 xjs = xjs.to(args.gpu)
 
                 zis, zjs, loss, logit_label = _step(model, xis, xjs, criterion)
+                avg_loss += loss.item()
                 
                 if args.mix:
                     loss = _mix_step(model, xis, xjs, zis, zjs, loss, args)
+                    avg_mix_loss += loss.item()
 
                 acc1 = accuracy(logit_label[0], logit_label[1])
                 avg_acc += acc1[0].item()
-                avg_loss += loss.item()
 
                 # logging
                 if args.log_every_n_steps != -1 and n_iter % args.log_every_n_steps == 0:
-                    print('iter {:d}: train loss {:.6f}, acc@1 {:.2f}'.format(n_iter, avg_loss/args.log_every_n_steps, avg_acc/args.log_every_n_steps))
-                    avg_loss = avg_acc = 0
+                    print('iter {:d}: train loss {:.6f}, mixed loss {:.6f}, acc@1 {:.2f}'.format(
+                        n_iter, avg_loss/args.log_every_n_steps, avg_mix_loss/args.log_every_n_steps, avg_acc/args.log_every_n_steps))
+                    avg_loss = avg_mix_loss = avg_acc = 0
                     
                 if apex_support and args.fp16_precision:
                     with amp.scale_loss(loss, optimizer) as scaled_loss:
