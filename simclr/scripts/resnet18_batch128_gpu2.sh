@@ -5,7 +5,7 @@ mkdir -p ./results/pretrained
 mkdir -p ./results/lincls
 
 # set configs (let other configs unchanged if not needed)
-data_path="/data/home/bsmn0223/data/tiny-imagenet-200"
+data_path="/home/osilab/dataset/tiny-imagenet-200"
 exp_name="exp_simclr_res18_gpu2_batch128_tinyimg"
 
 # pretrain encoder
