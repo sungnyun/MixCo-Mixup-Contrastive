@@ -70,8 +70,8 @@ def parse_args():
                         help='feature dimension (default: 256)')
     parser.add_argument('--temperature', default=0.5, type=float,
                         help='softmax temperature (default: 0.5)')
-    parser.add_argument('--mix-temperature', default=0.05, type=float,
-                        help='softmax temperature (default: 0.01)')
+    parser.add_argument('--mix-temperature', default=0.5, type=float,
+                        help='softmax temperature (default: 0.5)')
 
     # lincls specific configs:
     parser.add_argument('-e', '--evaluate', dest='evaluate', action='store_true',
