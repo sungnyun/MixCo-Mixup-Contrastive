@@ -23,7 +23,7 @@ This repository contains python files that can train the model with mixup-based 
 
 ### Experiments
 
-1. In `moco/experiments/` and `simclr/scripts`, there are `.sh` files which include the commands that can reproduce our experimental results. Open and set the configs.
+1. In `./moco/experiments/` and `./simclr/scripts/`, there are `.sh` files which include the commands that can reproduce our experimental results. Open and set the configs.
 ```sh
 data_path="[your_data_path]"
 exp_name="[experiment_name]"
