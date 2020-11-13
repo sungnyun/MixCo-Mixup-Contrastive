@@ -1,6 +1,6 @@
 ## How to Reproduce our Results
 
-MixCo: Mix-up Contrastive Learning for Visual Representation (https://arxiv.org/abs/2010.06300)
+This repository contains PyTorch implementation code for the paper **MixCo: Mix-up Contrastive Learning for Visual Representation (https://arxiv.org/abs/2010.06300)** that is accepted in NeurIPS 2020 Workshop on Self-Supervised Learning.
 
 This is an instruction to reproduce our results, based on the source code we have provided.
 
@@ -11,10 +11,8 @@ This is an instruction to reproduce our results, based on the source code we hav
 wget http://cs231n.stanford.edu/tiny-imagenet-200.zip 
 ```
 2. Unzip the file and place the folder into `[your_data_path]`.
-3. For linear classification, you may also need CIFAR10 and CIFAR100 dataset. If you do not have them, find the line below and change to `download=True`. Then, it will download the dataset before training.
-```sh
-train_dataset = DATASETS[args.dataset](args.data_path, train=True, download=False, transform=train_transform)
-``` 
+3. Also, download the ImageNet train dataset.
+4. For linear classification, you may also need CIFAR10 and CIFAR100 dataset. If you do not have them, give the argument `--download` when running `lincls.py`. Then, it will download the dataset before training.
 
 ### Structure
 This repository contains python files that can train the model with mixup-based representaion learning.
@@ -25,7 +23,7 @@ This repository contains python files that can train the model with mixup-based 
 
 ### Experiments
 
-1. In `./experiments/` directory, there are `.sh` files which include the commands that can reproduce our experimental results. Open and set the configs.
+1. In `moco/experiments/` and `simclr/scripts`, there are `.sh` files which include the commands that can reproduce our experimental results. Open and set the configs.
 ```sh
 data_path="[your_data_path]"
 exp_name="[experiment_name]"
@@ -34,4 +32,5 @@ exp_name="[experiment_name]"
 ```sh
 bash experiments/exp_mix_res18_tinyimg.sh
 ```
+3. You can find the pretraining and linear evaluation results in `results/results.json` file.
 
