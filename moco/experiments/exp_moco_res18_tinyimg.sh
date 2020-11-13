@@ -5,7 +5,7 @@ mkdir -p ./results/pretrained
 mkdir -p ./results/lincls
 
 # set configs (let other configs unchanged if not needed)
-data_path="./data/tiny-imagenet-200"
+data_path="../data/tiny-imagenet-200"
 exp_name="exp_moco_res18_tinyimg"
 
 # pretrain encoder
